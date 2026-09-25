@@ -1,0 +1,9 @@
+[project]
+name = "constructbench"
+version = "0.1.0"
+description = "A benchmark of AI models on construction work"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+anthropic = ["anthropic"]

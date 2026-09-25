@@ -1,0 +1,112 @@
+"""ConstructBench command line.
+
+  python -m constructbench generate --seed 1 --per-family 5 --out data/dev.jsonl
+  python -m constructbench run --tasks data/dev.jsonl --provider anthropic:claude-opus-5 --out results/opus5.jsonl
+  python -m constructbench score results/opus5.jsonl --tasks data/dev.jsonl
+  python -m constructbench leaderboard results/*.jsonl --tasks data/dev.jsonl --out results/LEADERBOARD.md
+  python -m constructbench show data/dev.jsonl vis-plan-0000 --save-images out/
+"""
+from __future__ import annotations
+
+import argparse
+import base64
+import json
+import sys
+from pathlib import Path
+
+from . import registry
+from .providers import make
+from .runner import load_tasks, save_tasks, run, regrade, summarize
+from .task import DOMAINS
+
+
+def _pct(x: float) -> str:
+    return f"{x * 100:.1f}%"
+
+
+def cmd_generate(a):
+    tasks = registry.build(a.seed, a.per_family, a.domain or None, a.family or None)
+    save_tasks(tasks, Path(a.out))
+    counts = {}
+    for t in tasks:
+        counts[t.domain] = counts.get(t.domain, 0) + 1
+    print(f"{len(tasks)} tasks → {a.out}")
+    for d, n in counts.items():
+        print(f"  {d:22s} {n}")
+
+
+def cmd_run(a):
+    tasks = load_tasks(Path(a.tasks))
+    run(make(a.provider, a.effort), tasks, Path(a.out), workers=a.workers)
+    cmd_score(argparse.Namespace(results=a.out, tasks=a.tasks, json=False))
+
+
+def cmd_score(a):
+    rows = regrade(Path(a.results), load_tasks(Path(a.tasks)))
+    s = summarize(rows)
+    if a.json:
+        print(json.dumps(s, indent=1)); return
+    o = s["overall"]
+    print(f"{Path(a.results).name}: {o['correct']}/{o['n']} fully correct = {_pct(o['accuracy'])} "
+          f"(95% CI {_pct(o['ci95'][0])}–{_pct(o['ci95'][1])}), field score {_pct(o['field_score'])}")
+    for d, v in s["domains"].items():
+        print(f"  {d:22s} {_pct(v['accuracy']):>7s}  ({v['correct']}/{v['n']}; fields {_pct(v['field_score'])})")
+
+
+def cmd_leaderboard(a):
+    tasks = load_tasks(Path(a.tasks))
+    runs = []
+    for p in a.results:
+        rows = regrade(Path(p), tasks)
+        if rows:
+            runs.append((rows[0]["provider"], summarize(rows)))
+    runs.sort(key=lambda r: r[1]["overall"]["accuracy"], reverse=True)
+    doms = [d for d in DOMAINS if any(d in s["domains"] for _, s in runs)]
+    short = {"architecture": "Arch", "design": "Design", "estimating": "Estim", "preconstruction": "Precon",
+             "project_management": "PM", "finance": "Finance", "document_recognition": "Docs", "visual_intelligence": "Visual"}
+    lines = ["# ConstructBench leaderboard", "", f"Task set: `{Path(a.tasks).name}` · {len(tasks)} tasks · accuracy = every field right", "",
+             "| Model | Overall | " + " | ".join(short[d] for d in doms) + " |", "|---|---|" + "---|" * len(doms)]
+    for name, s in runs:
+        o = s["overall"]
+        cells = [(_pct(s["domains"][d]["accuracy"]) if d in s["domains"] else "—") for d in doms]
+        lines.append(f"| {name} | **{_pct(o['accuracy'])}** ({o['n']}) | " + " | ".join(cells) + " |")
+    lines += ["", "Domains: " + "; ".join(f"**{short[d]}** — {DOMAINS[d]}" for d in doms)]
+    text = "\n".join(lines) + "\n"
+    if a.out:
+        Path(a.out).write_text(text)
+    print(text)
+
+
+def cmd_show(a):
+    t = next((t for t in load_tasks(Path(a.tasks)) if t.id == a.id), None)
+    if not t:
+        sys.exit(f"no task {a.id}")
+    print(f"[{t.domain} / {t.category} / {t.difficulty}] {t.title}\n\n{t.prompt}\n\nReference: {json.dumps(t.answer)}")
+    if a.save_images and t.attachments:
+        d = Path(a.save_images); d.mkdir(parents=True, exist_ok=True)
+        for att in t.attachments:
+            (d / att["name"]).write_bytes(base64.b64decode(att["data"]))
+            print(f"image → {d / att['name']}")
+
+
+def main(argv=None):
+    p = argparse.ArgumentParser(prog="constructbench", description="Benchmark AI models on construction work.")
+    sub = p.add_subparsers(dest="cmd", required=True)
+    g = sub.add_parser("generate"); g.add_argument("--seed", type=int, default=1); g.add_argument("--per-family", type=int, default=5)
+    g.add_argument("--domain", action="append"); g.add_argument("--family", action="append"); g.add_argument("--out", default="data/dev.jsonl")
+    g.set_defaults(fn=cmd_generate)
+    r = sub.add_parser("run"); r.add_argument("--tasks", required=True); r.add_argument("--provider", required=True)
+    r.add_argument("--out", required=True); r.add_argument("--effort", default="high"); r.add_argument("--workers", type=int, default=4)
+    r.set_defaults(fn=cmd_run)
+    s = sub.add_parser("score"); s.add_argument("results"); s.add_argument("--tasks", required=True); s.add_argument("--json", action="store_true")
+    s.set_defaults(fn=cmd_score)
+    lb = sub.add_parser("leaderboard"); lb.add_argument("results", nargs="+"); lb.add_argument("--tasks", required=True); lb.add_argument("--out")
+    lb.set_defaults(fn=cmd_leaderboard)
+    sh = sub.add_parser("show"); sh.add_argument("tasks"); sh.add_argument("id"); sh.add_argument("--save-images")
+    sh.set_defaults(fn=cmd_show)
+    a = p.parse_args(argv)
+    a.fn(a)
+
+
+if __name__ == "__main__":
+    main()
