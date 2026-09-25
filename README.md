@@ -15,6 +15,7 @@ industry do every day — scored per domain so a result says *where* a model is 
 | Document recognition | Invoice / delivery ticket / lien waiver extraction, G703 error-finding |
 | Visual intelligence | Rendered floor plans (areas), plan symbol counts, Gantt chart reading — as images |
 | Safety | Incident rates (TRIR/DART/LTIR), fall clearance, trench protection — plus rendered drawings: ladder setup (4:1, 3 ft extension), workers inside a crane swing radius, guardrail heights |
+| Robotics | Robot path planning on a rendered occupancy map, layout-robot coordinate transforms, arm kinematics & reach, drone survey flight plans, rebar-tying and bricklaying robots vs crews |
 
 ## How it works
 
@@ -23,7 +24,7 @@ industry do every day — scored per domain so a result says *where* a model is 
   new seed gives a fresh, unseen set. Publish on a dev seed; keep a private seed for held-out scoring.
 - **Strict grading.** Models end with `ANSWER: {json}`. Each field is graded (numeric tolerances, sets, dates);
   a task is correct only when every field is. Field-level partial credit is reported alongside.
-- **Honest error bars.** Accuracy is reported with a 95% Wilson interval.
+- **Honest error bars.** Accuracy is reported with a 95% Wilson interval, per domain and per difficulty, with mean time per task.
 - **No dependencies** for generating and scoring (Python 3.10+ stdlib). `pip install anthropic` only to run Claude.
 
 ## Use

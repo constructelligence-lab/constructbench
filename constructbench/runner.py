@@ -45,7 +45,8 @@ def run(provider: Provider, tasks: list[Task], out: Path, workers: int = 4, log=
             t = futures[fut]
             r = fut.result()
             g = grade(t, r.text)
-            f.write(json.dumps({"task_id": t.id, "domain": t.domain, "category": t.category, "provider": provider.name,
+            f.write(json.dumps({"task_id": t.id, "domain": t.domain, "category": t.category, "difficulty": t.difficulty,
+                                "provider": provider.name,
                                 "response": asdict(r), "grade": asdict(g)}) + "\n")
             f.flush()
             log(f"  [{n}/{len(todo)}] {t.id}: {'correct' if g.correct else 'wrong' if g.parsed else 'no answer'}")
@@ -64,6 +65,7 @@ def regrade(results: Path, tasks: list[Task]) -> list[dict]:
         if t is None:
             continue
         row["grade"] = asdict(grade(t, row["response"]["text"]))
+        row["difficulty"] = t.difficulty          # older result files predate this field
         rows.append(row)
     return rows
 
@@ -85,14 +87,20 @@ def summarize(rows: list[dict]) -> dict:
         k = sum(1 for r in sel if r["grade"]["correct"])
         partial = sum(r["grade"]["field_score"] for r in sel) / n if n else 0.0
         lo, hi = wilson(k, n)
+        secs = [r["response"].get("seconds") or 0 for r in sel]
+        toks = [r["response"].get("output_tokens") for r in sel if r["response"].get("output_tokens")]
         return {"n": n, "correct": k, "accuracy": k / n if n else 0.0, "ci95": [lo, hi], "field_score": partial,
                 "unparsed": sum(1 for r in sel if not r["grade"]["parsed"]),
-                "errors": sum(1 for r in sel if not r["response"]["ok"])}
+                "errors": sum(1 for r in sel if not r["response"]["ok"]),
+                "mean_seconds": sum(secs) / n if n else 0.0,
+                "mean_output_tokens": sum(toks) / len(toks) if toks else None}
     out = {"overall": agg(rows), "domains": {}, "categories": {}}
     for d in DOMAINS:
         sel = [r for r in rows if r["domain"] == d]
         if sel:
             out["domains"][d] = agg(sel)
+    out["difficulty"] = {d: agg([r for r in rows if r.get("difficulty") == d]) for d in ("easy", "medium", "hard")
+                         if any(r.get("difficulty") == d for r in rows)}
     for c in sorted({r["category"] for r in rows}):
         out["categories"][c] = agg([r for r in rows if r["category"] == c])
     toks = [r["response"].get("output_tokens") for r in rows if r["response"].get("output_tokens")]

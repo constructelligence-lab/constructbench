@@ -23,7 +23,7 @@ from .task import DOMAINS
 # Column labels for tables; any domain without one falls back to its name, so a new domain can't break a report.
 SHORT = {"architecture": "Arch", "design": "Design", "estimating": "Estim", "preconstruction": "Precon",
          "scheduling": "Sched", "project_management": "PM", "finance": "Finance", "document_recognition": "Docs",
-         "visual_intelligence": "Visual", "safety": "Safety"}
+         "visual_intelligence": "Visual", "safety": "Safety", "robotics": "Robotics"}
 
 
 def short(d: str) -> str:
@@ -60,7 +60,9 @@ def cmd_score(a):
     print(f"{Path(a.results).name}: {o['correct']}/{o['n']} fully correct = {_pct(o['accuracy'])} "
           f"(95% CI {_pct(o['ci95'][0])}–{_pct(o['ci95'][1])}), field score {_pct(o['field_score'])}")
     for d, v in s["domains"].items():
-        print(f"  {d:22s} {_pct(v['accuracy']):>7s}  ({v['correct']}/{v['n']}; fields {_pct(v['field_score'])})")
+        print(f"  {d:22s} {_pct(v['accuracy']):>7s}  ({v['correct']}/{v['n']}; fields {_pct(v['field_score'])}; "
+              f"{v['mean_seconds']:.1f}s/task)")
+    print("  by difficulty: " + ", ".join(f"{d} {_pct(v['accuracy'])} ({v['correct']}/{v['n']})" for d, v in s["difficulty"].items()))
 
 
 def cmd_leaderboard(a):
@@ -105,6 +107,10 @@ def cmd_compare(a):
     for d in DOMAINS:
         if d in sa["domains"]:
             lines.append(row(DOMAINS[d].split(" — ")[0], sa["domains"][d], sb["domains"][d]))
+    lines += ["", "| Difficulty | " + na + " | " + nb + " | Gap |", "|---|---|---|---|"]
+    for d in sa["difficulty"]:
+        lines.append(row(d.capitalize(), sa["difficulty"][d], sb["difficulty"][d]))
+    lines += ["", f"Mean time per task: {na} {sa['overall']['mean_seconds']:.1f}s · {nb} {sb['overall']['mean_seconds']:.1f}s"]
     lines += ["", f"Only {na} right: {len(only_a)} · only {nb} right: {len(only_b)} · both right: "
               f"{sum(1 for i in both if ga[i]['grade']['correct'] and gb[i]['grade']['correct'])} · both wrong: "
               f"{sum(1 for i in both if not ga[i]['grade']['correct'] and not gb[i]['grade']['correct'])}"]

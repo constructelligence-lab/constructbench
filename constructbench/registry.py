@@ -11,7 +11,7 @@ import random
 from typing import Callable
 
 from .task import Task, DOMAINS
-from .generators import finance, field_ops, documents, design, precon, visual, scheduling, safety
+from .generators import finance, field_ops, documents, design, precon, visual, scheduling, safety, robotics
 
 Family = Callable[[random.Random, int], Task]
 
@@ -59,6 +59,13 @@ FAMILIES: dict[str, Family] = {
     "ladder_image": safety.ladder,
     "crane_zone_image": safety.crane_zone,
     "guardrail_image": safety.guardrail,
+    # construction robotics (path_planning is a rendered occupancy map)
+    "path_planning": robotics.path_planning,
+    "layout_transform": robotics.layout_transform,
+    "kinematics": robotics.arm,
+    "drone_survey": robotics.drone_survey,
+    "rebar_tying": robotics.rebar_tying,
+    "bricklaying": robotics.bricklaying,
 }
 
 
