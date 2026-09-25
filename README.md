@@ -1,6 +1,6 @@
 # ConstructBench
 
-A benchmark of AI models on construction work — the calculations, checks and readings people in the
+A benchmark of AI models on construction and the wider built world — the calculations, checks and readings people in the
 industry do every day — scored per domain so a result says *where* a model is strong or weak.
 
 | Domain | What it tests |
@@ -16,6 +16,9 @@ industry do every day — scored per domain so a result says *where* a model is 
 | Visual intelligence | Rendered floor plans (areas), plan symbol counts, Gantt chart reading — as images |
 | Safety | Incident rates (TRIR/DART/LTIR), fall clearance, trench protection — plus rendered drawings: ladder setup (4:1, 3 ft extension), workers inside a crane swing radius, guardrail heights |
 | Robotics | Robot path planning on a rendered occupancy map, layout-robot coordinate transforms, arm kinematics & reach, drone survey flight plans, rebar-tying and bricklaying robots vs crews |
+| Civil & infrastructure | Earthwork cut/fill by the grid method, gravity pipe slope & Manning capacity, asphalt paving tonnage |
+| Sustainability & energy | Embodied carbon of a material take-off, energy use intensity & cost, rooftop solar sizing & payback |
+| Real estate & facilities | Development pro forma (yield on cost, value, margin), lifecycle cost / NPV of two options, maintenance backlog priority |
 
 ## How it works
 

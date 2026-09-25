@@ -23,7 +23,8 @@ from .task import DOMAINS
 # Column labels for tables; any domain without one falls back to its name, so a new domain can't break a report.
 SHORT = {"architecture": "Arch", "design": "Design", "estimating": "Estim", "preconstruction": "Precon",
          "scheduling": "Sched", "project_management": "PM", "finance": "Finance", "document_recognition": "Docs",
-         "visual_intelligence": "Visual", "safety": "Safety", "robotics": "Robotics"}
+         "visual_intelligence": "Visual", "safety": "Safety", "robotics": "Robotics",
+         "civil": "Civil", "sustainability": "Sustain", "real_estate": "RE & FM"}
 
 
 def short(d: str) -> str:
