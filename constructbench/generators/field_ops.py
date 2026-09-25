@@ -43,44 +43,6 @@ def g703(rng: random.Random, i: int) -> Task:
                 {"error_lines": [str(rows[b][0]) for b in bad], "corrected_total_completed": r2(correct_total_g)}, fields)
 
 
-def cpm(rng: random.Random, i: int) -> Task:
-    """Critical path: project duration and the critical activities, finish-to-start logic."""
-    n = rng.randint(7, 11)
-    ids = [chr(ord("A") + k) for k in range(n)]
-    names = ["Mobilize", "Excavate", "Footings", "Foundation walls", "Underground MEP", "Slab on grade", "Steel erection",
-             "Deck & pour", "Roofing", "Exterior envelope", "MEP rough-in", "Framing", "Drywall", "Finishes", "Commissioning"]
-    dur = {a: rng.randint(2, 15) for a in ids}
-    preds = {ids[0]: []}
-    for k in range(1, n):
-        cands = ids[max(0, k - 3):k]
-        m = 1 if k < 2 else rng.choice([1, 1, 2])
-        preds[ids[k]] = sorted(rng.sample(cands, min(m, len(cands))))
-    # Every activity except the last feeds something, so the network has one end.
-    fed = {p for ps in preds.values() for p in ps}
-    for a in ids[:-1]:
-        if a not in fed:
-            preds[ids[-1]] = sorted(set(preds[ids[-1]]) | {a})
-    es, ef = {}, {}
-    for a in ids:
-        es[a] = max((ef[p] for p in preds[a]), default=0)
-        ef[a] = es[a] + dur[a]
-    project = max(ef.values())
-    succ = {a: [b for b in ids if a in preds[b]] for a in ids}
-    lf, ls = {}, {}
-    for a in reversed(ids):
-        lf[a] = min((ls[s] for s in succ[a]), default=project)
-        ls[a] = lf[a] - dur[a]
-    critical = [a for a in ids if ls[a] - es[a] == 0]
-    table = "\n".join(f"| {a} | {names[k % len(names)]} | {dur[a]} | {', '.join(preds[a]) or '—'} |" for k, a in enumerate(ids))
-    fields = {"project_duration_days": INTEGER, "critical_activities": SET}
-    prompt = ("Schedule network for a building job. Durations are working days; all logic is finish-to-start with no "
-              "lags, and the project starts on day 0.\n\n| ID | Activity | Duration | Predecessors |\n|---|---|---|---|\n"
-              + table + "\n\nGive the project duration and the IDs of every activity with zero total float.\n"
-              + answer_keys_line(fields))
-    return Task(f"cpm-{i:04d}", "project_management", "scheduling", "Critical path", "hard", prompt,
-                {"project_duration_days": project, "critical_activities": critical}, fields)
-
-
 def labor(rng: random.Random, i: int) -> Task:
     budget_hrs = round_to(rng.uniform(800, 9_000), 10)
     pct = rng.randint(20, 80)

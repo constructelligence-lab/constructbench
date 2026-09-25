@@ -20,6 +20,16 @@ from .runner import load_tasks, save_tasks, run, regrade, summarize
 from .task import DOMAINS
 
 
+# Column labels for tables; any domain without one falls back to its name, so a new domain can't break a report.
+SHORT = {"architecture": "Arch", "design": "Design", "estimating": "Estim", "preconstruction": "Precon",
+         "scheduling": "Sched", "project_management": "PM", "finance": "Finance", "document_recognition": "Docs",
+         "visual_intelligence": "Visual", "safety": "Safety"}
+
+
+def short(d: str) -> str:
+    return SHORT.get(d, d)
+
+
 def _pct(x: float) -> str:
     return f"{x * 100:.1f}%"
 
@@ -62,15 +72,45 @@ def cmd_leaderboard(a):
             runs.append((rows[0]["provider"], summarize(rows)))
     runs.sort(key=lambda r: r[1]["overall"]["accuracy"], reverse=True)
     doms = [d for d in DOMAINS if any(d in s["domains"] for _, s in runs)]
-    short = {"architecture": "Arch", "design": "Design", "estimating": "Estim", "preconstruction": "Precon",
-             "project_management": "PM", "finance": "Finance", "document_recognition": "Docs", "visual_intelligence": "Visual"}
     lines = ["# ConstructBench leaderboard", "", f"Task set: `{Path(a.tasks).name}` · {len(tasks)} tasks · accuracy = every field right", "",
-             "| Model | Overall | " + " | ".join(short[d] for d in doms) + " |", "|---|---|" + "---|" * len(doms)]
+             "| Model | Overall | " + " | ".join(short(d) for d in doms) + " |", "|---|---|" + "---|" * len(doms)]
     for name, s in runs:
         o = s["overall"]
         cells = [(_pct(s["domains"][d]["accuracy"]) if d in s["domains"] else "—") for d in doms]
         lines.append(f"| {name} | **{_pct(o['accuracy'])}** ({o['n']}) | " + " | ".join(cells) + " |")
-    lines += ["", "Domains: " + "; ".join(f"**{short[d]}** — {DOMAINS[d]}" for d in doms)]
+    lines += ["", "Domains: " + "; ".join(f"**{short(d)}** — {DOMAINS[d]}" for d in doms)]
+    text = "\n".join(lines) + "\n"
+    if a.out:
+        Path(a.out).write_text(text)
+    print(text)
+
+
+def cmd_compare(a):
+    """Two runs side by side on the tasks both answered: per-domain accuracy, the gap, and where they disagree."""
+    tasks = load_tasks(Path(a.tasks))
+    ra, rb = regrade(Path(a.a), tasks), regrade(Path(a.b), tasks)
+    ga = {r["task_id"]: r for r in ra}
+    gb = {r["task_id"]: r for r in rb}
+    both = sorted(set(ga) & set(gb))
+    na, nb = ra[0]["provider"] if ra else a.a, rb[0]["provider"] if rb else a.b
+    sa, sb = summarize([ga[i] for i in both]), summarize([gb[i] for i in both])
+    only_a = [i for i in both if ga[i]["grade"]["correct"] and not gb[i]["grade"]["correct"]]
+    only_b = [i for i in both if gb[i]["grade"]["correct"] and not ga[i]["grade"]["correct"]]
+    lines = [f"# {na} vs {nb}", "", f"{len(both)} tasks answered by both (of {len(tasks)} in `{Path(a.tasks).name}`).", "",
+             f"| Domain | {na} | {nb} | Gap |", "|---|---|---|---|"]
+    def row(label, x, y):
+        gap = (x["accuracy"] - y["accuracy"]) * 100
+        return f"| {label} | {_pct(x['accuracy'])} ({x['correct']}/{x['n']}) | {_pct(y['accuracy'])} ({y['correct']}/{y['n']}) | {gap:+.1f} pts |"
+    lines.append(row("**Overall**", sa["overall"], sb["overall"]))
+    for d in DOMAINS:
+        if d in sa["domains"]:
+            lines.append(row(DOMAINS[d].split(" — ")[0], sa["domains"][d], sb["domains"][d]))
+    lines += ["", f"Only {na} right: {len(only_a)} · only {nb} right: {len(only_b)} · both right: "
+              f"{sum(1 for i in both if ga[i]['grade']['correct'] and gb[i]['grade']['correct'])} · both wrong: "
+              f"{sum(1 for i in both if not ga[i]['grade']['correct'] and not gb[i]['grade']['correct'])}"]
+    skipped = sorted(set(ga) ^ set(gb))
+    if skipped:
+        lines.append(f"Not compared (answered by only one run, e.g. image tasks for a text-only model): {len(skipped)}")
     text = "\n".join(lines) + "\n"
     if a.out:
         Path(a.out).write_text(text)
@@ -102,6 +142,8 @@ def main(argv=None):
     s.set_defaults(fn=cmd_score)
     lb = sub.add_parser("leaderboard"); lb.add_argument("results", nargs="+"); lb.add_argument("--tasks", required=True); lb.add_argument("--out")
     lb.set_defaults(fn=cmd_leaderboard)
+    cp = sub.add_parser("compare"); cp.add_argument("a"); cp.add_argument("b"); cp.add_argument("--tasks", required=True); cp.add_argument("--out")
+    cp.set_defaults(fn=cmd_compare)
     sh = sub.add_parser("show"); sh.add_argument("tasks"); sh.add_argument("id"); sh.add_argument("--save-images")
     sh.set_defaults(fn=cmd_show)
     a = p.parse_args(argv)

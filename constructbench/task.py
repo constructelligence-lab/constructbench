@@ -43,10 +43,12 @@ DOMAINS = {
     "design": "Design & engineering — structural, electrical and mechanical sizing",
     "estimating": "Estimating — quantity takeoff, unit-rate estimates, change-order pricing",
     "preconstruction": "Preconstruction — bid leveling, scope gaps, the bid-day number",
-    "project_management": "Project management — schedule logic, earned value, productivity, RFIs",
+    "scheduling": "Scheduling — critical path, float, delay impact, look-aheads, schedule quality",
+    "project_management": "Project management — earned value, productivity, RFIs",
     "finance": "Cost control & finance — WIP, retainage, cash flow",
     "document_recognition": "Document recognition — reading invoices, tickets, waivers and pay applications",
     "visual_intelligence": "Visual intelligence — reading drawings and charts from images",
+    "safety": "Safety — incident rates, fall clearance, excavation, and hazards read from rendered drawings",
 }
 
 

@@ -2,6 +2,11 @@
 
   anthropic:<model>   Claude via the official `anthropic` SDK (pip install anthropic; credentials from the
                       environment or `ant auth login`). Default model: claude-opus-5.
+  local:<model>[@<base url>]
+                      A model on an OpenAI-compatible local server — LM Studio (default http://127.0.0.1:1234/v1),
+                      Ollama (http://127.0.0.1:11434/v1), llama.cpp, vLLM. This is how the Constructelligence
+                      assistant's own open model is served, so this is the provider for "our model".
+                      Add --images to send image tasks to a vision model.
   command:<shell cmd> Any other model or local runtime: the prompt goes to the command's stdin and its stdout is
                       the response (e.g. `command:ollama run llama3.1`). Images are not passed; visual tasks are
                       skipped for text-only providers.
@@ -10,7 +15,11 @@
 """
 from __future__ import annotations
 
+import base64
 import json
+import os
+import urllib.error
+import urllib.request
 import shlex
 import subprocess
 import time
@@ -122,11 +131,57 @@ class Claude(Provider):
                         ok=msg.stop_reason != "refusal", error="refusal" if msg.stop_reason == "refusal" else None)
 
 
+class Local(Provider):
+    """An open-weight model behind an OpenAI-compatible /chat/completions endpoint (stdlib HTTP, no SDK)."""
+
+    def __init__(self, model: str, base_url: str = "http://127.0.0.1:1234/v1", images: bool = False,
+                 max_tokens: int = 4096, timeout: int = 900):
+        self.model, self.base_url, self.max_tokens, self.timeout = model, base_url.rstrip("/"), max_tokens, timeout
+        self.supports_images = images
+        self.name = f"local:{model}"
+
+    def answer(self, task: Task) -> Response:
+        if task.attachments and self.supports_images:
+            content: Any = [{"type": "image_url", "image_url": {"url": f"data:{a['media_type']};base64,{a['data']}"}}
+                            for a in task.attachments] + [{"type": "text", "text": task.prompt}]
+        else:
+            content = task.prompt
+        body = {"model": self.model, "max_tokens": self.max_tokens, "temperature": 0,
+                "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": content}]}
+        headers = {"Content-Type": "application/json"}
+        if os.environ.get("LOCAL_API_KEY"):
+            headers["Authorization"] = "Bearer " + os.environ["LOCAL_API_KEY"]
+        req = urllib.request.Request(self.base_url + "/chat/completions", data=json.dumps(body).encode(), headers=headers)
+        t0 = time.time()
+        for attempt in range(3):
+            try:
+                with urllib.request.urlopen(req, timeout=self.timeout) as r:
+                    out = json.load(r)
+                ch = out["choices"][0]
+                usage = out.get("usage") or {}
+                return Response(text=ch["message"].get("content") or "", stop_reason=ch.get("finish_reason"),
+                                input_tokens=usage.get("prompt_tokens"), output_tokens=usage.get("completion_tokens"),
+                                seconds=time.time() - t0)
+            except urllib.error.HTTPError as e:
+                if e.code in (429, 500, 502, 503) and attempt < 2:
+                    time.sleep(2 ** attempt * 3); continue
+                return Response(text="", ok=False, error=f"HTTP {e.code}: {e.read()[:300]!r}", seconds=time.time() - t0)
+            except (urllib.error.URLError, TimeoutError) as e:
+                return Response(text="", ok=False, error=f"connection: {e}", seconds=time.time() - t0)
+        return Response(text="", ok=False, error="retries exhausted", seconds=time.time() - t0)
+
+
 def make(spec: str, effort: str = "high") -> Provider:
     if spec == "oracle":
         return Oracle()
     if spec == "blank":
         return Blank()
+    if spec.startswith("local:"):
+        rest = spec[len("local:"):]
+        images = rest.endswith("+images")
+        rest = rest[: -len("+images")] if images else rest
+        model, _, url = rest.partition("@")
+        return Local(model, url or "http://127.0.0.1:1234/v1", images=images)
     if spec.startswith("command:"):
         return Command(spec[len("command:"):])
     if spec.startswith("anthropic:") or spec == "anthropic":

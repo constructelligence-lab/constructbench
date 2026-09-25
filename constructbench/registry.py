@@ -11,7 +11,7 @@ import random
 from typing import Callable
 
 from .task import Task, DOMAINS
-from .generators import finance, field_ops, documents, design, precon, visual
+from .generators import finance, field_ops, documents, design, precon, visual, scheduling, safety
 
 Family = Callable[[random.Random, int], Task]
 
@@ -31,8 +31,13 @@ FAMILIES: dict[str, Family] = {
     # preconstruction
     "bid_leveling": precon.bid_leveling,
     "bid_day": precon.bid_day,
+    # scheduling
+    "critical_path": scheduling.critical_path,
+    "float": scheduling.floats,
+    "delay_impact": scheduling.delay_impact,
+    "lookahead": scheduling.lookahead,
+    "schedule_health": scheduling.health,
     # project management
-    "scheduling": field_ops.cpm,
     "evm": finance.evm,
     "labor": field_ops.labor,
     "rfi_log": precon.rfi_log,
@@ -47,6 +52,13 @@ FAMILIES: dict[str, Family] = {
     "floor_plan": visual.floor_plan,
     "symbol_count": visual.symbols,
     "gantt": visual.gantt,
+    # safety (the last three are rendered drawings)
+    "incident_rates": safety.incident_rates,
+    "fall_clearance": safety.fall_clearance,
+    "excavation": safety.trench,
+    "ladder_image": safety.ladder,
+    "crane_zone_image": safety.crane_zone,
+    "guardrail_image": safety.guardrail,
 }
 
 
