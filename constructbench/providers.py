@@ -7,6 +7,10 @@
                       Ollama (http://127.0.0.1:11434/v1), llama.cpp, vLLM. This is how the Constructelligence
                       assistant's own open model is served, so this is the provider for "our model".
                       Add --images to send image tasks to a vision model.
+  ci:<model>[@<base url>]
+                      The Constructelligence small-model agent (agent.py): the same local model, writing a Python program
+                      per task that the agent runs, fixes from its own errors and votes over — the answer shape taken from
+                      the prompt's "Answer keys" line, never from the grader. Text tasks only.
   command:<shell cmd> Any other model or local runtime: the prompt goes to the command's stdin and its stdout is
                       the response (e.g. `command:ollama run llama3.1`). Images are not passed; visual tasks are
                       skipped for text-only providers.
@@ -182,6 +186,10 @@ def make(spec: str, effort: str = "high") -> Provider:
         rest = rest[: -len("+images")] if images else rest
         model, _, url = rest.partition("@")
         return Local(model, url or "http://127.0.0.1:1234/v1", images=images)
+    if spec.startswith("ci:"):
+        from .agent import Agent
+        model, _, url = spec[len("ci:"):].partition("@")
+        return Agent(model, url or "http://127.0.0.1:1234/v1")
     if spec.startswith("command:"):
         return Command(spec[len("command:"):])
     if spec.startswith("anthropic:") or spec == "anthropic":
