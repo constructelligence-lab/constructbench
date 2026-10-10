@@ -50,9 +50,11 @@ DOMAINS = {
     "visual_intelligence": "Visual intelligence — reading drawings and charts from images",
     "safety": "Safety — incident rates, fall clearance, excavation, and hazards read from rendered drawings",
     "robotics": "Construction robotics — navigation on occupancy maps, layout transforms, arm kinematics, drone survey plans, robot vs crew productivity",
-    "civil": "Civil & infrastructure — earthwork, gravity drainage, paving",
+    "civil": "Civil & infrastructure — earthwork, gravity drainage, paving, survey leveling",
     "sustainability": "Sustainability & energy — embodied carbon, energy use intensity, solar PV",
     "real_estate": "Real estate & facilities — development pro formas, lifecycle cost, maintenance priority",
+    "quality": "Quality control — concrete strength acceptance, field compaction against the Proctor",
+    "contracts": "Contracts & claims — time extensions, concurrency, liquidated damages, lien and prompt-payment deadlines",
 }
 
 

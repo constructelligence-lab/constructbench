@@ -24,7 +24,8 @@ from .task import DOMAINS
 SHORT = {"architecture": "Arch", "design": "Design", "estimating": "Estim", "preconstruction": "Precon",
          "scheduling": "Sched", "project_management": "PM", "finance": "Finance", "document_recognition": "Docs",
          "visual_intelligence": "Visual", "safety": "Safety", "robotics": "Robotics",
-         "civil": "Civil", "sustainability": "Sustain", "real_estate": "RE & FM"}
+         "civil": "Civil", "sustainability": "Sustain", "real_estate": "RE & FM",
+         "quality": "QC", "contracts": "Contracts"}
 
 
 def short(d: str) -> str:
@@ -136,6 +137,14 @@ def cmd_show(a):
             print(f"image → {d / att['name']}")
 
 
+def cmd_decontam(a):
+    from . import decontam
+    report = decontam.check(load_tasks(Path(a.tasks)), [Path(p) for p in a.corpus], a.n, a.min_numbers, a.run, a.coverage)
+    print(json.dumps(report if a.ids else {k: v for k, v in report.items() if k != "task_ids"}, indent=2))
+    if a.fail_over is not None and report["contaminated_rate"] > a.fail_over:
+        raise SystemExit(f"contaminated: {report['contaminated']} of {report['tasks']} tasks appear in the corpus")
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="constructbench", description="Benchmark AI models on construction work.")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -153,6 +162,14 @@ def main(argv=None):
     cp.set_defaults(fn=cmd_compare)
     sh = sub.add_parser("show"); sh.add_argument("tasks"); sh.add_argument("id"); sh.add_argument("--save-images")
     sh.set_defaults(fn=cmd_show)
+    dc = sub.add_parser("decontam", help="flag benchmark items that appear in a training corpus (numbers kept)")
+    dc.add_argument("tasks"); dc.add_argument("corpus", nargs="+")
+    dc.add_argument("--n", type=int, default=12); dc.add_argument("--min-numbers", type=int, default=3)
+    dc.add_argument("--run", type=int, default=4, help="consecutive numbers that fingerprint an item")
+    dc.add_argument("--coverage", type=float, default=0.5, help="share of a task's fingerprint that must appear to flag it")
+    dc.add_argument("--ids", action="store_true", help="list the contaminated task ids")
+    dc.add_argument("--fail-over", type=float, help="exit 1 when the contaminated rate is above this (CI gate)")
+    dc.set_defaults(fn=cmd_decontam)
     a = p.parse_args(argv)
     a.fn(a)
 

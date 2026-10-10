@@ -16,9 +16,11 @@ industry do every day — scored per domain so a result says *where* a model is 
 | Visual intelligence | Rendered floor plans (areas), plan symbol counts, Gantt chart reading — as images |
 | Safety | Incident rates (TRIR/DART/LTIR), fall clearance, trench protection — plus rendered drawings: ladder setup (4:1, 3 ft extension), workers inside a crane swing radius, guardrail heights |
 | Robotics | Robot path planning on a rendered occupancy map, layout-robot coordinate transforms, arm kinematics & reach, drone survey flight plans, rebar-tying and bricklaying robots vs crews |
-| Civil & infrastructure | Earthwork cut/fill by the grid method, gravity pipe slope & Manning capacity, asphalt paving tonnage |
+| Civil & infrastructure | Earthwork cut/fill by the grid method, gravity pipe slope & Manning capacity, asphalt paving tonnage, differential leveling loops with misclosure |
 | Sustainability & energy | Embodied carbon of a material take-off, energy use intensity & cost, rooftop solar sizing & payback |
 | Real estate & facilities | Development pro forma (yield on cost, value, margin), lifecycle cost / NPV of two options, maintenance backlog priority |
+| Quality control | Concrete strength acceptance (three-test running averages and the individual-test limit), field compaction against the Proctor with a moisture window |
+| Contracts & claims | Time extensions, concurrency and compensable days, liquidated damages with a cap; preliminary notice, lien and foreclosure deadlines with weekend roll-forward, prompt-payment interest |
 
 ## How it works
 
@@ -40,6 +42,7 @@ python -m constructbench run --tasks data/dev.jsonl --provider local:qwen2.5:7b-
 python -m constructbench compare results/ours.jsonl results/opus-5.jsonl --tasks data/dev.jsonl --out results/COMPARE.md
 python -m constructbench leaderboard results/*.jsonl --tasks data/dev.jsonl --out results/LEADERBOARD.md
 python -m constructbench show data/dev.jsonl vis-plan-0000 --save-images out/
+python -m constructbench decontam data/dev.jsonl path/to/training/*.jsonl --ids   # before trusting a fine-tuned model's score
 python -m unittest discover -s tests
 ```
 
@@ -47,6 +50,14 @@ Providers: `anthropic:<model>` (official SDK, adaptive thinking, `--effort`), `l
 stdin/stdout; text only, so image tasks are skipped), `oracle` (must score 100%), `blank` (0%).
 Claude runs record refusals as refusals — no fallback model, so the score is the named model's.
 Runs are resumable and store raw responses, so a grader fix re-scores without re-running.
+
+## Contamination
+
+A fine-tuned model's score means nothing if its training data held the items. `decontam` fingerprints every task by
+long n-grams that carry numbers and by runs of the prompt's own numbers (so short prompts are covered too), drops
+anything two items share (that is template, not item), and flags a task when the corpus holds at least half of its
+fingerprint — and either two separate pieces of it or its whole number sequence. `--fail-over 0` makes it a CI gate.
+Generating a fresh seed is still the stronger guarantee; `decontam` is the check that the training side kept its word.
 
 ## Add a task family
 
