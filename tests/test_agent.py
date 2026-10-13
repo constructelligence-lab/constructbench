@@ -9,7 +9,9 @@ import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from constructbench.agent import Agent, answer_keys, coerce, run_program, vote
+from constructbench.agent import (Agent, answer_keys, coerce, options_in, parse_tables, run_program, snap, tidy,
+                                  vote)
+from constructbench.toolkit import cpm, irr, npv, pv_annuity, round_half_up
 from constructbench.grading import grade
 from constructbench.task import Task
 
@@ -89,6 +91,57 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(coerce(True, "string"), "yes")
         self.assertIsNone(coerce(True, "number"))
 
+    def test_tidy_fixes_units_after_numbers_and_money_strings(self):
+        self.assertEqual(tidy("w = 204.0 'ft'"), "w = 204.0  # 'ft'")
+        self.assertEqual(tidy("h = 12 ft  # wall"), "h = 12  # ft  # wall")
+        self.assertEqual(tidy("c = ['$21,500', \"1,250.5\"]"), "c = [21500, 1250.5]")
+        for keep in ["x = 5 if a else 6", "v = float('1,250'.replace(',', ''))", "name = 'Bay 3'", "y = 2 * x  # ft"]:
+            self.assertEqual(tidy(keep), keep)
+        res, err = run_program("w = 204.0 'ft'\nprint(json.dumps({'a': w * 2}))")
+        self.assertEqual((res, err), ({"a": 408.0}, ""))
+
+    def test_answer_keys_keep_types_with_detail(self):
+        p = 'Answer keys: "delivery_date" (string YYYY-MM-DD), "ids" (array of strings), "n" (integer).'
+        self.assertEqual(answer_keys(p), [("delivery_date", "string"), ("ids", "array"), ("n", "integer")])
+
+    def test_markdown_tables_are_parsed_with_numbers(self):
+        p = ("Bids:\n\n| Bidder | Base bid | Markup | Preds |\n|---|---|---|---|\n| Acme | $21,500 | 12% | B, D |\n"
+             "| Bolt | (3,000) | 7.5 | — |\n\nAnswer keys: \"x\" (number).")
+        self.assertEqual(parse_tables(p), [[{"Bidder": "Acme", "Base bid": 21500, "Markup": 12, "Preds": "B, D"},
+                                            {"Bidder": "Bolt", "Base bid": -3000, "Markup": 7.5, "Preds": "—"}]])
+        res, err = run_program("print(json.dumps({'s': sum(r['Base bid'] for r in TABLES[0])}))", tables=parse_tables(p))
+        self.assertEqual((res, err), ({"s": 18500}, ""))
+
+    def test_toolkit(self):
+        r = cpm([{"id": "A", "duration": 10, "preds": "—"}, {"id": "B", "duration": 5, "preds": "A"},
+                 {"id": "C", "duration": 3, "preds": "A"}, {"id": "D", "duration": 2, "preds": ["B", "C"]}])
+        self.assertEqual(r["duration"], 17)
+        self.assertEqual(r["critical"], ["A", "B", "D"])
+        self.assertEqual((r["by_id"]["C"]["tf"], r["by_id"]["C"]["ff"]), (2, 2))
+        self.assertAlmostEqual(pv_annuity(1000, 0.07, 20), 10594.01, places=2)
+        self.assertAlmostEqual(irr([-1000, 600, 600]), 0.1307, places=4)
+        self.assertAlmostEqual(npv(0.1, [-100, 110]), 0.0, places=9)
+        self.assertEqual((round_half_up(2.5), round_half_up(-2.5), round_half_up(1.005, 2)), (3, -3, 1.01))
+        res, _ = run_program("print(json.dumps({'d': cpm([{'id': 'A', 'duration': 4}])['duration']}))")
+        self.assertEqual(res, {"d": 4})
+        res, err = run_program("print(json.dumps({'d': 1}))", toolkit=False)
+        self.assertEqual(res, {"d": 1})
+
+    def test_choice_answers_snap_to_the_offered_options(self):
+        p = 'Which is lower ("A" or "B")? Must the site "import" or "export"?\nAnswer keys: "lower" (string), "io" (string).'
+        o = options_in(p, answer_keys(p))
+        self.assertEqual(o, ["A", "B", "import", "export"])
+        self.assertEqual([snap(v, o) for v in ["Option A", " b ", "Import soil", "neither", "A or B"]],
+                         ["A", "B", "import", "neither", "A or B"])
+
+    def test_integers_and_lists_are_coerced_and_list_order_does_not_split_a_vote(self):
+        self.assertEqual(coerce(59.0000001, "integer"), 59)
+        self.assertEqual(coerce(59.4, "integer"), 59.4)
+        self.assertIsNone(coerce(float("nan"), "number"))
+        self.assertEqual(coerce("A, B", "array"), ["A", "B"])
+        got = vote([{"x": ["B", "A"]}, {"x": ["C"]}, {"x": ["A", "B"]}], [("x", "array")])
+        self.assertEqual(got, {"x": ["B", "A"]})
+
     # ── whole answers ──
     def test_a_correct_program_is_graded_correct(self):
         Stub.replies = [program({"area_sq_ft": 120.0, "complies": "yes"})] * 3
@@ -102,6 +155,20 @@ class AgentTests(unittest.TestCase):
         r = Agent("m", self.url).answer(self.task())
         self.assertTrue(grade(self.task(), r.text).correct)
         self.assertIn("ZeroDivisionError", json.dumps(Stub.seen[1]["messages"][-1]))
+        self.assertIn("A divisor is zero", json.dumps(Stub.seen[1]["messages"][-1]))
+
+    def test_tables_and_toolkit_are_described_to_the_model(self):
+        t = self.task()
+        t.prompt = "| ID | Duration |\n|---|---|\n| A | 3 |\n" + t.prompt
+        Stub.replies = [program({"area_sq_ft": 120, "complies": "yes"})] * 3
+        Agent("m", self.url).answer(t)
+        user = Stub.seen[0]["messages"][1]["content"]
+        self.assertIn("TABLES[0]: 1 rows", user)
+        self.assertIn("cpm(activities)", user)
+        Stub.seen = []
+        Stub.replies = [program({"area_sq_ft": 120, "complies": "yes"})] * 3
+        Agent("m", self.url, tables=False, toolkit=False).answer(t)
+        self.assertNotIn("TABLES", Stub.seen[0]["messages"][1]["content"])
 
     def test_one_bad_program_is_outvoted(self):
         Stub.replies = [program({"area_sq_ft": 120, "complies": "yes"}), program({"area_sq_ft": 999, "complies": "no"}),
@@ -115,6 +182,24 @@ class AgentTests(unittest.TestCase):
         Stub.replies = [program({"area_sq_ft": 120, "complies": "yes"})] * 3
         b = Agent("m", self.url).answer(self.task(answer={"area_sq_ft": -1, "complies": "no"})).text
         self.assertEqual(a, b)
+
+    def test_a_split_with_no_majority_samples_more(self):
+        Stub.replies = [program({"area_sq_ft": 100, "complies": "yes"}), program({"area_sq_ft": 110, "complies": "yes"}),
+                        program({"area_sq_ft": 120, "complies": "yes"}), program({"area_sq_ft": 120, "complies": "yes"})]
+        r = Agent("m", self.url).answer(self.task())
+        self.assertEqual(len(Stub.seen), 4)
+        self.assertTrue(grade(self.task(), r.text).correct, r.text)
+
+    def test_an_agreed_answer_does_not_sample_more(self):
+        Stub.replies = [program({"area_sq_ft": 120, "complies": "yes"})] * 5
+        Agent("m", self.url).answer(self.task())
+        self.assertEqual(len(Stub.seen), 3)
+
+    def test_no_program_runs_falls_back_to_a_direct_answer(self):
+        Stub.replies = ["no code here"] * 9 + ['Area is 120.\nANSWER: {"area_sq_ft": 120, "complies": "yes", "x": 1}']
+        r = Agent("m", self.url).answer(self.task())
+        self.assertIn("Answered directly", r.text)
+        self.assertTrue(grade(self.task(), r.text).correct, r.text)
 
     def test_nothing_runs_still_gives_an_answer_line(self):
         Stub.replies = ["no code here"] * 12
