@@ -25,7 +25,7 @@ SHORT = {"architecture": "Arch", "design": "Design", "estimating": "Estim", "pre
          "scheduling": "Sched", "project_management": "PM", "finance": "Finance", "document_recognition": "Docs",
          "visual_intelligence": "Visual", "safety": "Safety", "robotics": "Robotics",
          "civil": "Civil", "sustainability": "Sustain", "real_estate": "RE & FM",
-         "quality": "QC", "contracts": "Contracts"}
+         "quality": "QC", "contracts": "Contracts", "bim": "BIM"}
 
 
 def short(d: str) -> str:

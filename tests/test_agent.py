@@ -11,7 +11,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from constructbench.agent import (Agent, answer_keys, coerce, options_in, parse_tables, run_program, sanity, snap,
                                   tidy, vote)
-from constructbench.toolkit import cpm, irr, npv, pv_annuity, round_half_up
+from constructbench.agent import parse_bullets, parse_texts, prompt_inputs
+from constructbench.toolkit import box_gap, box_overlap, cpm, irr, npv, parse_step, pv_annuity, round_half_up, step_args
 from constructbench.grading import grade
 from constructbench.task import Task
 
@@ -126,6 +127,45 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(res, {"d": 4})
         res, err = run_program("print(json.dumps({'d': 1}))", toolkit=False)
         self.assertEqual(res, {"d": 1})
+
+    def test_texts_and_bullets_are_preloaded(self):
+        p = ("Codes:\n- Project: ABC\n- Role: A, S\n\nFiles:\n- ABC-1\n- ABC-2\n\n```\n#1=IFCWALL('g',$,'W-1');\n```\n"
+             "--- document (OCR text) ---\nTICKET T-5\n--- end ---\nAnswer keys: \"n\" (integer).")
+        self.assertEqual(parse_bullets(p), [["Project: ABC", "Role: A, S"], ["ABC-1", "ABC-2"]])
+        self.assertEqual(parse_texts(p), ["#1=IFCWALL('g',$,'W-1');", "TICKET T-5"])
+        res, err = run_program("print(json.dumps({'n': len(BULLETS[1]), 'w': parse_step(TEXTS[0])['#1']['args'][2]}))",
+                               inputs=prompt_inputs(p))
+        self.assertEqual((res, err), ({"n": 2, "w": "W-1"}, ""))
+
+    def test_step_parser_and_box_helpers(self):
+        self.assertEqual(step_args("'it''s',#5,(#1,#2),$,.ELEMENT.,4.5,IFCLABEL('a,b'),*"),
+                         ["it's", "#5", ["#1", "#2"], None, "ELEMENT", 4.5, "IFCLABEL('a,b')", None])
+        e = parse_step("#10=IFCQUANTITYVOLUME('NetVolume',$,$,6.997,$);\n#11=IFCELEMENTQUANTITY('g',#5,'Qto',$,$,(#10));")
+        self.assertEqual(e["#11"]["args"][5], ["#10"])
+        self.assertEqual(e["#10"]["args"][3], 6.997)
+        self.assertEqual(box_overlap((0, 100, 0, 100, 0, 100), (50, 150, 0, 100, 0, 100)), [50, 100, 100])
+        self.assertEqual(box_gap((0, 100, 0, 100, 0, 100), (130, 200, 140, 200, 0, 100)), 50.0)
+        self.assertEqual(box_gap((0, 100, 0, 100, 0, 100), (100, 200, 0, 100, 0, 100)), 0.0)
+
+    def test_the_toolkit_solves_a_generated_ifc_task(self):
+        from constructbench import registry
+        for t in registry.build(seed=5, per_family=4, families=["ifc_quantities"]):
+            code = """e = parse_step(TEXTS[0])
+st = {k: v['args'][2] for k, v in e.items() if v['type'] == 'IFCBUILDINGSTOREY'}
+lvl, q = {}, {}
+for k, v in e.items():
+    if v['type'] == 'IFCRELCONTAINEDINSPATIALSTRUCTURE':
+        for x in v['args'][4]: lvl[x] = st[v['args'][5]]
+    if v['type'] == 'IFCRELDEFINESBYPROPERTIES':
+        qs = {e[r]['args'][0]: e[r]['args'][3] for r in e[v['args'][5]]['args'][5]}
+        for x in v['args'][4]: q[x] = qs
+walls = [k for k, v in e.items() if v['type'] == 'IFCWALL']
+print(json.dumps({'v': sum(q[w]['NetVolume'] for w in walls if lvl[w] == 'Level 2'),
+                  'd': sum(1 for k, v in e.items() if v['type'] == 'IFCDOOR' and lvl[k] == 'Level 1')}))"""
+            res, err = run_program(code, inputs=prompt_inputs(t.prompt))
+            self.assertEqual(err, "")
+            self.assertAlmostEqual(res["v"], t.answer["level2_wall_net_volume_m3"], places=3)
+            self.assertEqual(res["d"], t.answer["level1_door_count"])
 
     def test_choice_answers_snap_to_the_offered_options(self):
         p = 'Which is lower ("A" or "B")? Must the site "import" or "export"?\nAnswer keys: "lower" (string), "io" (string).'

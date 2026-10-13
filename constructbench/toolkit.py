@@ -1,10 +1,11 @@
 """Helpers the ci: agent preloads into every program it runs — standard construction calculations a small model gets
 wrong by hand, done once and tested here.
 
-Only `math` and `decimal` may be imported: this file's source is executed inside the agent's sandbox, ahead of the model's program.
+Only `math`, `re` and `decimal` may be imported: this file's source is executed inside the agent's sandbox, ahead of the model's program.
 Nothing here knows any task's answer; each helper is a textbook method (CPM forward/backward pass, time value of money).
 """
 import math
+import re as _re
 from decimal import ROUND_HALF_UP, Decimal
 
 
@@ -102,10 +103,91 @@ def round_half_up(x, places=0):
     return int(r) if places <= 0 else r
 
 
+def _step_value(tok):
+    tok = tok.strip()
+    if tok in ("$", "*", ""):
+        return None
+    if tok.startswith("'") and tok.endswith("'"):
+        return tok[1:-1].replace("''", "'")
+    if tok.startswith(".") and tok.endswith(".") and len(tok) > 2:
+        return tok[1:-1]                                    # enumeration: .ELEMENT. -> 'ELEMENT'
+    if tok.startswith("#"):
+        return tok                                          # reference kept as '#123'
+    try:
+        return float(tok) if any(c in tok for c in ".eE") else int(tok)
+    except ValueError:
+        return tok                                          # typed value such as IFCLABEL('x') stays as text
+
+
+def step_args(s):
+    """The attribute list of one STEP entity, 'a',#1,(#2,#3),$,.T.,1.5 -> ['a', '#1', ['#2', '#3'], None, 'T', 1.5]."""
+    out, stack, tok, in_str, i = [], [], "", False, 0
+    cur = out
+    while i < len(s):
+        ch = s[i]
+        if in_str:
+            tok += ch
+            if ch == "'":
+                if i + 1 < len(s) and s[i + 1] == "'":
+                    tok += "'"; i += 1
+                else:
+                    in_str = False
+        elif ch == "'":
+            in_str, tok = True, tok + ch
+        elif ch == "(" and tok.strip() == "":
+            new = []
+            cur.append(new); stack.append(cur); cur = new
+        elif ch == "(":
+            depth, j = 1, i + 1                             # a typed value like IFCLABEL('x'): keep it whole
+            while j < len(s) and depth:
+                depth += {"(": 1, ")": -1}.get(s[j], 0); j += 1
+            tok += s[i:j]; i = j - 1
+        elif ch == ")":
+            if tok.strip():
+                cur.append(_step_value(tok))
+            tok = ""
+            cur = stack.pop()
+        elif ch == ",":
+            if tok.strip():
+                cur.append(_step_value(tok))
+            elif s[i - 1] not in ")":
+                cur.append(None)
+            tok = ""
+        else:
+            tok += ch
+        i += 1
+    if tok.strip():
+        cur.append(_step_value(tok))
+    return out
+
+
+def parse_step(text):
+    """An IFC/STEP file (or excerpt) -> {'#123': {'type': 'IFCWALL', 'args': [...]}}. Lists come back as Python lists,
+    references as '#n' strings, $ as None, enumerations without dots, numbers as numbers."""
+    ents = {}
+    for m in _re.finditer(r"(#\d+)\s*=\s*([A-Z0-9_]+)\s*\((.*?)\)\s*;\s*(?=#\d+\s*=|$|ENDSEC)", text, _re.S):
+        ents[m.group(1)] = {"type": m.group(2), "args": step_args(m.group(3))}
+    return ents
+
+
+def box_overlap(a, b):
+    """Per-axis overlap of two boxes given as (x0, x1, y0, y1, z0, z1); a hard clash when all three are > 0."""
+    return [min(a[1], b[1]) - max(a[0], b[0]), min(a[3], b[3]) - max(a[2], b[2]), min(a[5], b[5]) - max(a[4], b[4])]
+
+
+def box_gap(a, b):
+    """Clear distance between two boxes (0 when they touch or overlap): √(gx² + gy² + gz²)."""
+    g = [max(0, b[k] - a[k + 1], a[k] - b[k + 1]) for k in (0, 2, 4)]
+    return math.sqrt(sum(v * v for v in g))
+
+
 HELP = """Already defined for you (call them, do not re-implement):
 - cpm(activities) — critical path, finish-to-start, no lags. activities = [{'id': 'A', 'duration': 10, 'preds': 'B, D'}, ...]
   ('preds' may be a list or a string; '—' means none). Returns {'duration': n, 'critical': [ids with zero total float],
   'by_id': {id: {'es','ef','ls','lf','tf','ff'}}}.
 - pv(amount, rate, years), pv_annuity(payment, rate, years), npv(rate, cashflows_from_year_0), irr(cashflows)
   — rate as a fraction (7% -> 0.07); payments at the end of each year.
-- round_half_up(x, places=0) — rounds .5 up (Python's round() rounds .5 to even)."""
+- round_half_up(x, places=0) — rounds .5 up (Python's round() rounds .5 to even).
+- parse_step(text) — an IFC/STEP file -> {'#123': {'type': 'IFCWALL', 'args': [...]}}; references stay '#n' strings,
+  lists are lists, $ is None, .ENUM. is 'ENUM'. Follow references through the dict.
+- box_overlap(a, b) -> [ox, oy, oz] and box_gap(a, b) -> clear distance, boxes as (x0, x1, y0, y1, z0, z1)."""

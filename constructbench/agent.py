@@ -51,7 +51,8 @@ Write ONE Python program that solves the task:
   intermediate values unless the task says to.
 - For yes/no or choice answers, compute the condition and produce exactly the words the task asks for.
 - Numbers are plain Python numbers: no units, $, commas or % inside them (units go in comments: x = 204.0  # ft).
-- Write tables from the task as lists of dicts with numeric values, and loop over them rather than retyping values.
+- Data the task gives (tables, file excerpts, lists) is preloaded as TABLES / TEXTS / BULLETS when listed below —
+  loop over those rather than retyping values; otherwise write tables as lists of dicts with numeric values.
 - End with: print(json.dumps(answer)) where answer is a dict with exactly the answer keys.
 Only the modules math, json, statistics, fractions, itertools and datetime are available. No input(), files or network.
 Reply with the program in one ```python block and nothing else."""
@@ -76,7 +77,7 @@ builtins.__import__ = _imp
 for n in ('open', 'input', 'breakpoint', 'exit', 'quit'):
     builtins.__dict__.pop(n, None)
 job = json.loads(sys.stdin.read())
-g = {'__name__': '__main__', 'TABLES': job['tables']}
+g = {'__name__': '__main__', **job['inputs']}
 if job['toolkit']:
     exec(compile(job['toolkit'], 'toolkit.py', 'exec'), g)
 exec(compile(job['code'], 'program.py', 'exec'), g)
@@ -126,6 +127,48 @@ def describe_tables(tables: list[list[dict]]) -> str:
                    f"{json.dumps(rows[0], ensure_ascii=False) if rows else '{}'}")
     out.append("Text cells stay strings (e.g. predecessors 'B, D'); money and percent cells are plain numbers.")
     return "\n".join(out)
+
+
+FENCE = re.compile(r"```[^\n]*\n(.*?)```", re.S)
+DOCUMENT = re.compile(r"^-{3} document[^\n]*-{3}\n(.*?)^-{3} end -{3}", re.S | re.M)
+
+
+def parse_texts(prompt: str) -> list[str]:
+    """Verbatim blocks in the prompt — fenced code (an IFC/STEP file, a CSV) and '--- document --- … --- end ---' OCR
+    text — so a program reads them instead of retyping them."""
+    return [m.group(1).rstrip("\n") for m in FENCE.finditer(prompt)] + \
+           [m.group(1).rstrip("\n") for m in DOCUMENT.finditer(prompt)]
+
+
+def parse_bullets(prompt: str) -> list[list[str]]:
+    """Each run of consecutive '- item' lines (outside fenced blocks) as a list of item strings."""
+    runs, cur = [], []
+    for line in FENCE.sub("", prompt).splitlines():
+        m = re.match(r"^\s*[-*] (.+)$", line)
+        if m:
+            cur.append(m.group(1).strip())
+        elif cur:
+            runs.append(cur); cur = []
+    if cur:
+        runs.append(cur)
+    return runs
+
+
+def prompt_inputs(prompt: str) -> dict:
+    """What the agent preloads into every program: TABLES, TEXTS and BULLETS parsed from the prompt."""
+    return {"TABLES": parse_tables(prompt), "TEXTS": parse_texts(prompt), "BULLETS": parse_bullets(prompt)}
+
+
+def describe_inputs(inputs: dict) -> str:
+    out = [describe_tables(inputs.get("TABLES") or [])]
+    for n, t in enumerate(inputs.get("TEXTS") or []):
+        first = t.splitlines()[0] if t else ""
+        out.append(f"TEXTS[{n}] holds a verbatim block from the task ({len(t.splitlines())} lines, starting "
+                   f"{json.dumps(first[:80], ensure_ascii=False)}) — parse it from TEXTS[{n}], do not retype it.")
+    for n, b in enumerate(inputs.get("BULLETS") or []):
+        out.append(f"BULLETS[{n}] is the task's bulleted list of {len(b)} items as strings, first "
+                   f"{json.dumps(b[0], ensure_ascii=False)}.")
+    return "\n".join(x for x in out if x)
 
 
 def options_in(prompt: str, keys: list[tuple[str, str]]) -> list[str]:
@@ -211,8 +254,8 @@ def tidy(code: str) -> str:
     return MONEY_STRING.sub(lambda m: m.group(2).replace("$", "").replace(",", ""), code)
 
 
-def run_program(code: str, timeout: int = 10, tables: list | None = None,
-                toolkit: bool = True) -> tuple[dict | None, str]:
+def run_program(code: str, timeout: int = 10, tables: list | None = None, toolkit: bool = True,
+                inputs: dict | None = None) -> tuple[dict | None, str]:
     """Runs the program (with TABLES and the toolkit preloaded); returns (the printed answer dict, or None; the error)."""
     code = tidy(code)
     if FORBIDDEN.search(code):
@@ -227,7 +270,7 @@ def run_program(code: str, timeout: int = 10, tables: list | None = None,
     with tempfile.TemporaryDirectory() as tmp:
         try:
             p = subprocess.run([sys.executable, "-I", "-S", "-c", RUNNER, "-", json.dumps(sorted(ALLOWED_IMPORTS))],
-                               input=json.dumps({"code": code, "tables": tables or [],
+                               input=json.dumps({"code": code, "inputs": {"TABLES": tables or [], **(inputs or {})},
                                                  "toolkit": TOOLKIT_SRC if toolkit else ""}),
                                capture_output=True, text=True, timeout=timeout, cwd=tmp,
                                env={"PATH": os.environ.get("PATH", ""), "PYTHONHASHSEED": "0"})
@@ -344,19 +387,19 @@ class Agent:
         raise RuntimeError("retries exhausted")
 
     def _one_program(self, prompt: str, keys: list[tuple[str, str]], temperature: float, log: list,
-                     tables: list | None = None) -> dict | None:
+                     inputs: dict | None = None) -> dict | None:
         """One program, fixed up to `retries` times from its own error. A dict missing some keys is kept as a
         fallback in case no fix completes it."""
         key_line = ", ".join(f'"{k}" ({t}' + (f", {u}" if (u := knowledge.unit_of(k, t)) else "") + ")" for k, t in keys)
         extra = [knowledge.reference(prompt) if self.use_knowledge else "",
-                 describe_tables(tables or []), toolkit.HELP if self.use_toolkit else "",
+                 describe_inputs(inputs or {}), toolkit.HELP if self.use_toolkit else "",
                  f"The answer dict must have exactly these keys: {key_line}." if keys else ""]
         messages = [{"role": "system", "content": SYSTEM},
                     {"role": "user", "content": prompt + "".join("\n\n" + e for e in extra if e)}]
         best: dict | None = None
         for attempt in range(self.retries + 1):
             reply = self._chat(messages, temperature if attempt == 0 else max(temperature, 0.2))
-            result, err = run_program(extract_code(reply), tables=tables, toolkit=self.use_toolkit)
+            result, err = run_program(extract_code(reply), toolkit=self.use_toolkit, inputs=inputs)
             if result is not None and keys:
                 missing = [k for k, _ in keys if k not in result]
                 if missing:
@@ -398,12 +441,12 @@ class Agent:
         from .providers import Response
         t0 = time.time()
         keys = answer_keys(task.prompt)
-        tables = parse_tables(task.prompt) if self.use_tables else []
+        inputs = prompt_inputs(task.prompt) if self.use_tables else {}
         log: list = []
         note = ""
         try:
             temps = [0.0] + [0.6] * (self.samples - 1)
-            candidates = [c for c in (self._one_program(task.prompt, keys, t, log, tables) for t in temps) if c]
+            candidates = [c for c in (self._one_program(task.prompt, keys, t, log, inputs) for t in temps) if c]
             # A split with no majority on some field: sample more programs (up to max_samples) to break it.
             while keys and candidates and len(temps) < self.max_samples:
                 support: dict = {}
@@ -411,7 +454,7 @@ class Agent:
                 if all(support.get(k, 0) >= 2 for k, _ in keys):
                     break
                 temps.append(0.8)
-                c = self._one_program(task.prompt, keys, 0.8, log, tables)
+                c = self._one_program(task.prompt, keys, 0.8, log, inputs)
                 if c:
                     candidates.append(c)
             final = vote(candidates, keys) if keys else (candidates[0] if candidates else {})

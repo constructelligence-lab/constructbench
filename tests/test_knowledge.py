@@ -37,9 +37,21 @@ class KnowledgeTests(unittest.TestCase):
             for line in (DATA / f).read_text().splitlines():
                 used.update(names(json.loads(line)["prompt"]))
                 self.assertLess(len(reference(json.loads(line)["prompt"])), 2000)
-        # quality, contracts and leveling cards are for families newer than these files
-        newer = {"concrete acceptance", "compaction", "contract delays", "differential leveling"}
-        self.assertEqual({c.name for c in CARDS} - used - newer, set())
+        # families newer than these files: build them from the registry
+        from constructbench import registry
+        for t in registry.build(seed=1, per_family=2, domains=["quality", "contracts", "civil", "bim"]):
+            used.update(names(t.prompt))
+        self.assertEqual({c.name for c in CARDS} - used, set())
+
+    def test_bim_tasks_get_their_card_and_file_contents_do_not_choose_cards(self):
+        from constructbench import registry
+        want = {"clash_detection": "clash detection", "ifc_quantities": "IFC files",
+                "asset_register": "COBie and handover data", "file_naming": "ISO 19650 and the CDE",
+                "model_5d": "model-based cost and schedule"}
+        for fam, card in want.items():
+            for t in registry.build(seed=3, per_family=3, families=[fam]):
+                self.assertEqual(names(t.prompt)[0], card, fam)
+        self.assertEqual(names("Read the file.\n```\n#1=IFCWALL('Brick/Block concrete');\n```"), [])
 
     def test_unit_hints(self):
         self.assertEqual(unit_of("slope_percent"), "a percent: 12.5 means 12.5%")

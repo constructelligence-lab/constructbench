@@ -186,6 +186,38 @@ CARDS: tuple[Card, ...] = (
     Card("rebar layout", (r"rebar", r"\bbars?\b.*spacing", r"\btie (every|each)", r"\btying\b", r"intersections"),
          "Bars across a dimension = floor((dimension − 2 × cover) ÷ spacing) + 1, all in inches. Bars running the "
          "long way are counted across the short dimension, and vice versa. Intersections = long bars × short bars."),
+    # ── BIM & digital construction ──
+    Card("IFC files", (r"\bIFC", r"STEP", r"IFCWALL", r"IfcRel", r"IFCREL", r"property set", r"\bPset_", r"Qto_"),
+         "IFC (STEP): each line #id=TYPE(attributes);. Rooted entities start GlobalId, OwnerHistory, Name, Description, "
+         "ObjectType. Storey membership: IfcRelContainedInSpatialStructure(…, RelatedElements, RelatingStructure); "
+         "quantities and properties: IfcRelDefinesByProperties(…, RelatedObjects, RelatingPropertyDefinition) -> "
+         "IfcElementQuantity (Qto_*BaseQuantities: NetVolume vs GrossVolume, NetSideArea, NetArea) or IfcPropertySet "
+         "(Pset_*Common: IsExternal, LoadBearing, FireRating). Types via IfcRelDefinesByType; building/storey tree via "
+         "IfcRelAggregates. Use parse_step(TEXTS[0]) and follow the '#n' references — do not retype the file."),
+    Card("clash detection", (r"\bclash", r"federated", r"bounding box", r"clearance (distance|zone)", r"coordination"),
+         "Test only the pairs the rules allow (usually different disciplines). Hard clash: overlap > 0 on every axis "
+         "(box_overlap; touching is not hard). Clearance/soft clash: no hard clash but clear distance < the required "
+         "clearance (box_gap). Report each pair once (sort the two IDs). Overlap volume = ox × oy × oz; mm³ ÷ 1e9 = m³."),
+    Card("ISO 19650 and the CDE", (r"ISO 19650", r"\bCDE\b", r"common data environment", r"information container",
+                                   r"originator", r"suitability", r"\bBEP\b", r"\bEIR\b"),
+         "Container ID: Project-Originator-Volume/system-Level/location-Type-Role-Number, hyphen-delimited, each field "
+         "from the project's code lists (codes are case-sensitive; the number has the stated digit count). CDE states: "
+         "Work in progress -> Shared -> Published -> Archived. Suitability codes: S0 WIP, S1 coordination, S2 "
+         "information, S3 review & comment, S4 stage approval; revisions P01, P02 … (preliminary), C01 … (contractual). "
+         "Requirements chain: OIR/AIR/PIR -> EIR -> BEP -> MIDP/TIDP. Validate split('-') field by field."),
+    Card("COBie and handover data", (r"COBie", r"asset register", r"handover", r"\bO&M\b", r"facilities team",
+                                     r"serial"),
+         "COBie sheets: Contact, Facility, Floor, Space, Zone, Type, Component, System, Assembly, Connection, Spare, "
+         "Resource, Job, Document, Attribute. Type carries Manufacturer, ModelNumber, warranty; Component (one per "
+         "asset) carries Name/tag, TypeName, Space, SerialNumber, InstallationDate. Treat blank, 'n/a', '—' or "
+         "'TBC' as missing only as the task says. Completeness % = filled required cells ÷ (assets × required fields)."),
+    Card("model-based cost and schedule", (r"Uniformat", r"\b5D\b", r"\b4D\b", r"model (element )?schedule",
+                                          r"\bphase\b", r"MasterFormat", r"\bLOD\b", r"level of development"),
+         "5D: cost = model quantity × unit rate per assembly code; filter by phase first (price New; exclude "
+         "Existing/Demolished unless told otherwise). Uniformat II: A Substructure, B Shell, C Interiors, D Services, "
+         "E Equipment & furnishings, F Special construction, G Building sitework — the first letter is the group. "
+         "4D: link elements to activities and sum quantities by activity dates. LOD 100 concept, 200 approximate, "
+         "300 precise geometry, 350 interfaces, 400 fabrication, 500 as-built (field-verified)."),
     # ── documents ──
     Card("document extraction", (r"OCR", r"invoice", r"delivery ticket", r"lien waiver", r"extract the fields"),
          "Copy names, numbers and IDs exactly as printed (keep prefixes like T- or J-). Dates as YYYY-MM-DD. Amounts "
@@ -200,9 +232,10 @@ def _flags(trigger: str) -> int:
 
 
 def _prose(text: str) -> str:
-    """The task text without markdown table body rows (headers kept): names in rows such as an activity called
+    """The task text without fenced file excerpts or markdown table body rows (headers kept): names in rows such as an activity called
     'Roofing' or a bidder 'Harbor Crane & Rigging' say nothing about which method the task needs."""
     out, in_body = [], False
+    text = re.sub(r"```.*?```", "", text, flags=re.S)       # file excerpts (an IFC file) are data, not the question
     for line in text.splitlines():
         is_row = line.lstrip().startswith("|")
         if is_row and re.fullmatch(r"\s*\|?(\s*:?-{2,}:?\s*\|)+\s*", line):

@@ -21,6 +21,7 @@ industry do every day — scored per domain so a result says *where* a model is 
 | Real estate & facilities | Development pro forma (yield on cost, value, margin), lifecycle cost / NPV of two options, maintenance backlog priority |
 | Quality control | Concrete strength acceptance (three-test running averages and the individual-test limit), field compaction against the Proctor with a moisture window |
 | Contracts & claims | Time extensions, concurrency and compensable days, liquidated damages with a cap; preliminary notice, lien and foreclosure deadlines with weekend roll-forward, prompt-payment interest |
+| BIM & digital construction | Clash detection on federated-model bounding boxes (hard and clearance clashes), quantities read out of an IFC4 STEP file through its containment and quantity relationships, COBie-style handover asset QA, ISO 19650 container naming against project code lists, 5D cost roll-up by Uniformat from a model schedule |
 
 ## How it works
 

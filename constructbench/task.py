@@ -55,6 +55,7 @@ DOMAINS = {
     "real_estate": "Real estate & facilities — development pro formas, lifecycle cost, maintenance priority",
     "quality": "Quality control — concrete strength acceptance, field compaction against the Proctor",
     "contracts": "Contracts & claims — time extensions, concurrency, liquidated damages, lien and prompt-payment deadlines",
+    "bim": "BIM & digital construction — clash detection, IFC quantity extraction, handover asset data QA, ISO 19650 naming, 5D cost from a model",
 }
 
 
