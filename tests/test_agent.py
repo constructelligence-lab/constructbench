@@ -9,8 +9,8 @@ import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from constructbench.agent import (Agent, answer_keys, coerce, options_in, parse_tables, run_program, snap, tidy,
-                                  vote)
+from constructbench.agent import (Agent, answer_keys, coerce, options_in, parse_tables, run_program, sanity, snap,
+                                  tidy, vote)
 from constructbench.toolkit import cpm, irr, npv, pv_annuity, round_half_up
 from constructbench.grading import grade
 from constructbench.task import Task
@@ -182,6 +182,36 @@ class AgentTests(unittest.TestCase):
         Stub.replies = [program({"area_sq_ft": 120, "complies": "yes"})] * 3
         b = Agent("m", self.url).answer(self.task(answer={"area_sq_ft": -1, "complies": "no"})).text
         self.assertEqual(a, b)
+
+    def test_sanity_flags_fractions_negative_counts_and_non_finite(self):
+        keys = [("bundles", "integer"), ("ties", "integer"), ("cost", "number")]
+        self.assertEqual(sanity({"bundles": 996, "ties": 3.0, "cost": -5.5}, keys), [])
+        issues = sanity({"bundles": 995.6, "ties": -2, "cost": float("inf")}, keys)
+        self.assertEqual(len(issues), 3)
+        self.assertIn("math.ceil", issues[0])
+
+    def test_an_implausible_answer_is_sent_back_once(self):
+        task =Task.from_json({"id": "t-1", "domain": "estimating", "category": "c", "title": "t", "difficulty": "easy",
+                               "prompt": 'Order bundles.\nAnswer keys: "bundles" (integer).', "answer": {"bundles": 996},
+                               "fields": {"bundles": {"kind": "integer", "rel_tol": 0, "abs_tol": 0}},
+                               "meta": {}, "attachments": []})
+        Stub.replies = [program({"bundles": 995.63}), program({"bundles": 996})] + [program({"bundles": 996})] * 2
+        r = Agent("m", self.url).answer(task)
+        self.assertTrue(grade(task, r.text).correct, r.text)
+        self.assertIn("whole number", json.dumps(Stub.seen[1]["messages"][-1]))
+
+    def test_reference_cards_and_units_reach_the_model_and_can_be_turned_off(self):
+        t = self.task()
+        t.prompt = 'Compute the TRIR on 200,000 hours.\nAnswer keys: "trir" (number), "slope_percent" (number).'
+        Stub.replies = [program({"trir": 1, "slope_percent": 2})] * 3
+        Agent("m", self.url).answer(t)
+        user = Stub.seen[0]["messages"][1]["content"]
+        self.assertIn("incident rates:", user)
+        self.assertIn('"slope_percent" (number, a percent', user)
+        Stub.seen = []
+        Stub.replies = [program({"trir": 1, "slope_percent": 2})] * 3
+        Agent("m", self.url, knowledge=False).answer(t)
+        self.assertNotIn("Construction reference", Stub.seen[0]["messages"][1]["content"])
 
     def test_a_split_with_no_majority_samples_more(self):
         Stub.replies = [program({"area_sq_ft": 100, "complies": "yes"}), program({"area_sq_ft": 110, "complies": "yes"}),

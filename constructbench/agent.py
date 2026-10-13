@@ -37,7 +37,7 @@ import urllib.request
 from collections import Counter
 from typing import Any
 
-from . import toolkit
+from . import knowledge, toolkit
 from .task import Task
 
 # The type may carry detail after its name — "delivery_date" (string YYYY-MM-DD), "ids" (array of strings).
@@ -160,6 +160,24 @@ HINTS = [
 
 def hint(err: str) -> str:
     return next((h for k, h in HINTS if k in err), "")
+
+
+def sanity(result: dict, keys: list[tuple[str, str]]) -> list[str]:
+    """Answers that cannot be right whatever the task: a fraction where a whole number is asked for, a negative
+    count, a number that is not finite. Each is sent back once; a program that still gives it is accepted."""
+    out = []
+    for k, kind in keys:
+        v = result.get(k)
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            continue
+        if not math.isfinite(v):
+            out.append(f'"{k}" is not a finite number.')
+        elif kind == "integer" and abs(v - round(v)) > 1e-6:
+            out.append(f'"{k}" must be a whole number but is {v:g} — apply the rounding the task states '
+                       "(math.ceil for quantities to buy or units needed, math.floor for whole units that fit).")
+        elif kind == "integer" and v < 0:
+            out.append(f'"{k}" is a count but came out negative ({v:g}).')
+    return out
 
 
 def answer_keys(prompt: str) -> list[tuple[str, str]]:
@@ -295,9 +313,10 @@ class Agent:
 
     def __init__(self, model: str, base_url: str = "http://127.0.0.1:1234/v1", samples: int = 3,
                  retries: int = 2, max_tokens: int = 2048, timeout: int = 600, max_samples: int = 5,
-                 tables: bool = True, toolkit: bool = True):
+                 tables: bool = True, toolkit: bool = True, knowledge: bool = True, checks: bool = True):
         self.model, self.base_url = model, base_url.rstrip("/")
         self.use_tables, self.use_toolkit = tables, toolkit
+        self.use_knowledge, self.use_checks = knowledge, checks
         self.samples, self.retries, self.max_tokens, self.timeout = samples, retries, max_tokens, timeout
         self.max_samples = max(samples, max_samples)
         self.name = f"ci:{model}"
@@ -328,8 +347,9 @@ class Agent:
                      tables: list | None = None) -> dict | None:
         """One program, fixed up to `retries` times from its own error. A dict missing some keys is kept as a
         fallback in case no fix completes it."""
-        key_line = ", ".join(f'"{k}" ({t})' for k, t in keys)
-        extra = [describe_tables(tables or []), toolkit.HELP if self.use_toolkit else "",
+        key_line = ", ".join(f'"{k}" ({t}' + (f", {u}" if (u := knowledge.unit_of(k, t)) else "") + ")" for k, t in keys)
+        extra = [knowledge.reference(prompt) if self.use_knowledge else "",
+                 describe_tables(tables or []), toolkit.HELP if self.use_toolkit else "",
                  f"The answer dict must have exactly these keys: {key_line}." if keys else ""]
         messages = [{"role": "system", "content": SYSTEM},
                     {"role": "user", "content": prompt + "".join("\n\n" + e for e in extra if e)}]
@@ -344,12 +364,20 @@ class Agent:
                     if best is None or len(result) > len(best):
                         best = result
                     result = None
-            log.append({"t": temperature, "attempt": attempt, "error": err or None, "result": result})
-            if result is not None:
+            issues = sanity(result, keys) if result is not None and self.use_checks else []
+            log.append({"t": temperature, "attempt": attempt, "error": err or None, "result": result,
+                        **({"issues": issues} if issues else {})})
+            if result is not None and (not issues or attempt == self.retries):
                 return result
-            messages += [{"role": "assistant", "content": reply},
-                         {"role": "user", "content": f"Running that program failed:\n{err}\n{hint(err)}\n"
-                                                         "Fix it and reply with the whole corrected program."}]
+            if result is not None:
+                # It ran, but an answer is implausible: keep it, and ask once more with the reason.
+                best = result
+                feedback = (f"The program ran and printed {json.dumps(result)}, but: {' '.join(issues)} Re-read the "
+                            "task, fix the program and reply with the whole corrected program.")
+            else:
+                feedback = (f"Running that program failed:\n{err}\n{hint(err)}\n"
+                            "Fix it and reply with the whole corrected program.")
+            messages += [{"role": "assistant", "content": reply}, {"role": "user", "content": feedback}]
         return best
 
     def _direct(self, prompt: str, keys: list[tuple[str, str]]) -> dict:
