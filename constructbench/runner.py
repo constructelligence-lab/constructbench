@@ -149,7 +149,7 @@ def summarize(rows: list[dict]) -> dict:
         sel = [r for r in rows if r["domain"] == d]
         if sel:
             out["domains"][d] = agg(sel)
-    out["difficulty"] = {d: agg([r for r in rows if r.get("difficulty") == d]) for d in ("easy", "medium", "hard")
+    out["difficulty"] = {d: agg([r for r in rows if r.get("difficulty") == d]) for d in ("easy", "medium", "hard", "expert")
                          if any(r.get("difficulty") == d for r in rows)}
     for c in sorted({r["category"] for r in rows}):
         out["categories"][c] = agg([r for r in rows if r["category"] == c])
