@@ -118,3 +118,16 @@ The `ci:` agent is a different harness from `+code+submit` and is not part of th
   estimated at $1–3 (hard tasks think longer). Order: (1) Opus 5.5 baseline + harness, (2) Haiku 5.5 both
   (≈1/40 of Opus price), (3) Sonnet 5.5 both with what remains. Global cap $4.50 across all Claude files, task cap
   $0.40, 4 workers. Smoke-test records are kept (same task ids, resumed, not re-run).
+- **Result — Opus 5.5, quick set (41 tasks), effort high:** baseline 41/41 (100%, 95% CI 91.4–100%), $0.620,
+  mean 677 output tokens, 6.6 s/task; harness 41/41 (100%, same CI), $0.693, mean 355 output tokens, 9.8 s/task,
+  2.2 turns and 1.2 code runs per task, 41/41 answers via submit_answer, 0 rejected submissions, 0 task-budget
+  stops, 0 API errors. Field score 100% both. **Ceiling effect: the quick set cannot separate the conditions for
+  Opus 5.5.** Note: wall times measured under high machine load (load avg ~30–40) and 4 parallel workers.
+- Claude spend so far: $1.326 (incl. smoke test). Next: Haiku 5.5 and Sonnet 5.5, both conditions, same settings.
+- LM Studio (0.4.16) local server did not respond (`lms server start` stuck at "Waking up LM Studio service");
+  local open-weight runs deferred until it is restarted.
+- **Fresh held-out set created** (addresses threat 1): `data/fresh-s20261014.jsonl` = `registry.build(seed=20261014,
+  per_family=1)`, text-only tasks kept → 51 tasks, 16 domains (all text families incl. quality, contracts & claims,
+  BIM), 18 easy / 26 medium / 7 hard. SHA-256 `70cbf07a690043581f2783d6df09e3920f33828d69388c872ca59c5ecaf8d50c`.
+  Seed chosen after the harness was frozen at commit dec0233 (+ bench.sh manifest-filter fix); prompts were not
+  read by anyone before the runs (only counts were printed). Planned for all models after the quick set.
