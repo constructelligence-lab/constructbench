@@ -176,3 +176,29 @@ The `ci:` agent is a different harness from `+code+submit` and is not part of th
   descriptions and the extra turn add input. (3) The only accuracy change caused by the harness is negative and
   systematic (Haiku, identifier lists). (4) To study accuracy effects the benchmark needs harder items or weaker
   models — open-weight runs (LM Studio, needs a restart) and DeepSeek are next.
+
+### 2026-10-14 — expert tier (harder tasks)
+- Motivation: ceiling effect on quick/fresh sets for all Claude 5.5 models (above).
+- **Design** (commit 0a3a172, frozen before any model saw it): 7 new families, difficulty `expert`, in
+  `constructbench/generators/expert.py`. Each combines volume, several interacting stated conventions and a trap from
+  real documents:
+  | Family | Domain | Size | Conventions / traps |
+  |---|---|---|---|
+  | pdm_calendar | scheduling | 24–32 activities | FS/SS/FF with lags; working-day calendar with 4–7 holidays; answers as dates |
+  | pay_app_certification | finance | 22–30 SOV lines | planted G/H arithmetic errors; pending CO billed anyway (excluded); retainage 10% → 5% on D+E above 50% complete, 10% on stored |
+  | wip_portfolio | finance | 14–20 jobs | cost-to-cost POC; over/under billing not netted; full loss provision; 2 prior-year closed jobs to exclude |
+  | cost_ledger | finance | 110–155 CSV rows | other jobs; post-cut-off rows; duplicate entries; VOIDs cancelling invoices; credit memos; vs budgets |
+  | mass_haul | civil | 21–31 stations | average end area; shrinkage; mass-haul ordinates; balance in bcy |
+  | delay_tia | contracts | 6–9 events | day-level concurrency of owner/contractor/weather; 21-day notice bar; non-critical events; LDs |
+  | bid_leveling_expert | preconstruction | 5 bidders × 12 items | amount in words governs figures (1–2 bidders mis-typed); plugs; allowances; bond on subtotal; accepted alternate |
+  Ambiguous draws (ties, a value on a threshold) are redrawn from the same rng, so seeds stay reproducible.
+- **Validation:** `tests/test_expert.py` re-derives every answer from the prompt text alone with separately written
+  parsing/computation (seeds 1–3 × 8 per family): all agree. Also: oracle 100%, all answer keys readable by the
+  harness, both retainage branches occur (≈65/35), the "lowest figures ≠ low bidder" trap occurs, every ledger has
+  duplicates. One coverage bug found and fixed before freezing (pay apps were always > 50% complete).
+- Only seeds 1–3 were inspected while building. **Evaluation set:** `data/expert-s20261015.jsonl` =
+  `registry.build(seed=20261015, per_family=4)` over the 7 families → 28 tasks (scheduling 4, finance 12, civil 4,
+  contracts 4, preconstruction 4); prompts 102,570 characters in total. SHA-256
+  `35815916f558fb9b62153a6c7c8189a865bf1e7fc3d55d0b2b38d722d9e54849`. Not read before runs.
+- Plan: Haiku 5.5 pilot both conditions now (remaining Claude budget ≈ $0.46; folder cap $0.30 keeps the overall
+  total ≤ $4.85). Opus/Sonnet on this set need a budget top-up. Open-weight models when LM Studio is restarted.
