@@ -374,7 +374,7 @@ class Local(Provider):
         usage = out.get("usage") or {}
         return Response(text=ch["message"].get("content") or "", stop_reason=ch.get("finish_reason"),
                         input_tokens=usage.get("prompt_tokens"), output_tokens=usage.get("completion_tokens"),
-                        seconds=time.time() - t0)
+                        seconds=time.time() - t0, extra={"usage": _usage_totals({}, usage)})
 
     def _tool_loop(self, task: Task) -> Response:
         box = Toolbox(task, self.code, self.submit)
@@ -382,15 +382,16 @@ class Local(Provider):
                                                    "parameters": t["schema"]}} for t in box.tools]
         messages: list[dict[str, Any]] = [{"role": "system", "content": box.system},
                                           {"role": "user", "content": self._user(task)}]
-        t0, tin, tout, turns, text, stop = time.time(), 0, 0, 0, "", None
+        t0, tin, tout, turns, text, stop, raw = time.time(), 0, 0, 0, "", None, {}
         while turns < self.max_turns:
             turns += 1
             out, err = self._post({"model": self.model, "max_tokens": self.max_tokens, "temperature": 0,
                                    "messages": messages, "tools": tools, "tool_choice": "auto"})
             if err:
                 return Response(text=text, ok=False, error=err, seconds=time.time() - t0, input_tokens=tin,
-                                output_tokens=tout, extra=box.extra(turns))
+                                output_tokens=tout, extra={**box.extra(turns), "usage": raw})
             usage = out.get("usage") or {}
+            raw = _usage_totals(raw, usage)
             tin += usage.get("prompt_tokens") or 0
             tout += usage.get("completion_tokens") or 0
             ch = out["choices"][0]
@@ -416,7 +417,22 @@ class Local(Provider):
             if turns == self.max_turns - 1:
                 messages.append({"role": "user", "content": LAST_TURN_NOTE})
         return Response(text=box.finish(text), stop_reason=stop, input_tokens=tin, output_tokens=tout,
-                        seconds=time.time() - t0, extra=box.extra(turns))
+                        seconds=time.time() - t0, extra={**box.extra(turns), "usage": raw})
+
+
+def _usage_totals(acc: dict, usage: dict) -> dict:
+    """Adds an OpenAI-compatible usage block into running totals, keeping every numeric field the server reports
+    (DeepSeek: prompt_cache_hit_tokens / prompt_cache_miss_tokens; reasoning tokens under completion_tokens_details),
+    so cost can be computed afterwards from the provider's price list instead of a guessed one."""
+    out = dict(acc)
+    for k, v in (usage or {}).items():
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            out[k] = out.get(k, 0) + v
+        elif isinstance(v, dict):
+            for k2, v2 in v.items():
+                if isinstance(v2, (int, float)) and not isinstance(v2, bool):
+                    out[f"{k}.{k2}"] = out.get(f"{k}.{k2}", 0) + v2
+    return out
 
 
 def _flags(rest: str, allowed: set[str]) -> tuple[str, set[str]]:

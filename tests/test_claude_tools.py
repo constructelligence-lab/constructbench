@@ -159,7 +159,8 @@ class OpenAICompatibleToolLoop(unittest.TestCase):
         self.assertEqual(p.name, "local:test-model+code+submit")
         r = p.answer(self.task)
         self.assertTrue(grade(self.task, r.text).correct)
-        self.assertEqual(r.extra, {"turns": 3, "code_runs": 1, "submitted": True, "rejected_submits": 1})
+        self.assertEqual(r.extra, {"turns": 3, "code_runs": 1, "submitted": True, "rejected_submits": 1,
+                                   "usage": {"prompt_tokens": 150, "completion_tokens": 15}})
         sent = Script.seen[1]["body"]["messages"]
         self.assertEqual(sent[2]["reasoning_content"], "r1")         # thinking echoed back within the turn
         self.assertEqual((sent[3]["role"], sent[3]["content"].strip()), ("tool", "[]"))
