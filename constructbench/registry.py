@@ -11,7 +11,7 @@ import random
 from typing import Callable
 
 from .task import Task, DOMAINS
-from .generators import finance, field_ops, documents, design, precon, visual, scheduling, safety, robotics, built_world, quality_contracts, bim, expert
+from .generators import finance, field_ops, documents, design, precon, visual, scheduling, safety, robotics, built_world, quality_contracts, bim, expert, extreme
 
 Family = Callable[[random.Random, int], Task]
 
@@ -99,6 +99,11 @@ FAMILIES: dict[str, Family] = {
     "mass_haul": expert.mass_haul,
     "delay_tia": expert.delay_tia,
     "bid_leveling_expert": expert.bid_leveling_expert,
+    # extreme tier: several documents / rule layers interacting at size
+    "co_reconciliation": extreme.co_reconciliation,
+    "addendum_takeoff": extreme.addendum_takeoff,
+    "ledger_xl": extreme.ledger_xl,
+    "cashflow_forecast": extreme.cashflow_forecast,
 }
 
 
