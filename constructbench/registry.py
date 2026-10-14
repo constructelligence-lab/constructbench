@@ -11,7 +11,7 @@ import random
 from typing import Callable
 
 from .task import Task, DOMAINS
-from .generators import finance, field_ops, documents, design, precon, visual, scheduling, safety, robotics, built_world, quality_contracts, bim, expert, extreme
+from .generators import finance, field_ops, documents, design, precon, visual, scheduling, safety, robotics, built_world, quality_contracts, bim, expert, extreme, contractual
 
 Family = Callable[[random.Random, int], Task]
 
@@ -104,6 +104,10 @@ FAMILIES: dict[str, Family] = {
     "addendum_takeoff": extreme.addendum_takeoff,
     "ledger_xl": extreme.ledger_xl,
     "cashflow_forecast": extreme.cashflow_forecast,
+    # hidden rules (governing terms only in a contract excerpt among distractor clauses) and a chained task
+    "pay_app_contract": contractual.pay_app_contract,
+    "delay_contract": contractual.delay_contract,
+    "chained_concrete": contractual.chained_concrete,
 }
 
 
