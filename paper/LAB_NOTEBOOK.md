@@ -131,3 +131,48 @@ The `ci:` agent is a different harness from `+code+submit` and is not part of th
   BIM), 18 easy / 26 medium / 7 hard. SHA-256 `70cbf07a690043581f2783d6df09e3920f33828d69388c872ca59c5ecaf8d50c`.
   Seed chosen after the harness was frozen at commit dec0233 (+ bench.sh manifest-filter fix); prompts were not
   read by anyone before the runs (only counts were printed). Planned for all models after the quick set.
+- **Result — Haiku 5.5 and Sonnet 5.5, quick set, effort high** (same settings as Opus):
+  | Model | Baseline | Harness | Cost base / harness | Mean output tok base / harness | s/task base / harness |
+  |---|---|---|---|---|---|
+  | Opus 5.5 | 41/41 | 41/41 | $0.620 / $0.693 | 677 / 355 | 6.6 / 9.8 |
+  | Sonnet 5.5 | 41/41 | 41/41 | $0.243 / $0.319 | 515 / 289 | 3.8 / 4.0 |
+  | Haiku 5.5 | 41/41 | 40/41 | $0.021 / $0.025 | 946 / 649 | 4.2 / 5.0 |
+  Harness: every task answered through submit_answer except one Haiku task (40/41 submitted; the other ended by
+  the ANSWER line); mean 1.0–1.2 code runs and 2.0–2.2 turns; no rejected submissions, no task-budget stops, no
+  API errors in any run. Haiku price for cache reads assumed $0.01/MTok (not in the cached price table); effect on
+  totals < $0.001.
+- **Observed harness failure mode (Haiku, g703-0000, pay-application check):** the model identified the right two
+  erroneous lines (items 4 and 6) and the right corrected total, but submitted `error_lines` as two explanatory
+  sentences instead of line identifiers. The submit schema (array of strings, from the "Answer keys" line) cannot
+  express "identifiers only", so a correct finding was graded wrong; the baseline Haiku run answered this task
+  correctly. Not fixed — a change made after seeing a test result would be tuning on the test set; any fix must be
+  frozen before the fresh-seed runs and reported as a harness revision.
+- Interpretation so far: on seed-1 quick tasks all three current Claude models are at ceiling without tools; the
+  harness reduces output tokens 30–50% and costs 12–31% more (larger input, extra turn), with no accuracy gain
+  measurable at n = 41.
+- Spend so far $1.921. Next: fresh seed (51 tasks), Haiku → Sonnet → Opus, both conditions, cap $2.55 for that
+  folder (keeps the overall total ≤ $4.50).
+- **Result — fresh seed 20261014 (51 text tasks, 16 domains, never inspected), effort high:**
+  | Model | Baseline | Harness | Cost base / harness | Mean output tok base / harness | s/task base / harness |
+  |---|---|---|---|---|---|
+  | Opus 5.5 | 51/51 | 48/48 (3 not run, budget) | $0.882 / $0.859 | 758 / ~360 | 7.2 / 6.8 |
+  | Sonnet 5.5 | 51/51 | 51/51 | $0.356 / $0.454 | 592 / 341 | 4.8 / 4.8 |
+  | Haiku 5.5 | 51/51 | 50/51 | $0.031 / $0.039 | 1124 / 888 | 4.6 / 6.6 |
+  95% Wilson CI for 51/51: 93.0–100%. Harness: mean 1.1–1.2 code runs, 2.1 turns; no rejected submissions,
+  task-budget stops or API errors. Opus harness tasks not run: bim-cobie-0000, bim-name-0000, bim-5d-0000 (stopped by
+  the budget cap; a top-up run completed bim-ifc-0000 correct at $0.050 — 13,176 input tokens because the IFC file
+  text is preloaded into the tool description and the prompt).
+- **The Haiku failure mode replicated on the fresh seed:** g703-0000 (pay application) again — correct line found
+  (item 2), correct corrected total, but `error_lines` submitted as an explanatory sentence instead of the line
+  identifier. 2/2 Haiku harness misses across both sets are this same failure; 0 baseline misses. Systematic, not
+  noise: the free-form string array in the submit schema invites prose where the grader expects identifiers.
+- Budget accounting: the run cap stopped new tasks as designed; overshoot from tasks already in flight was $0.02
+  (cap 2.55, spent 2.572). **Total Claude spend (client-side estimate): $4.54** (quick $1.921 + fresh $2.622).
+  To be reconciled against the Console invoice.
+- **Conclusions so far (Claude family):** (1) Both task sets are at ceiling for Opus/Sonnet/Haiku 5.5 without
+  tools (92/92 baseline tasks correct for each of the three models across both sets); accuracy differences
+  between conditions are not measurable here. (2) The harness halves output tokens for Opus/Sonnet (−40 to −53%)
+  and trims Haiku's (−21 to −31%), but raises cost 12–31% except Opus on the fresh set (−3%), because tool
+  descriptions and the extra turn add input. (3) The only accuracy change caused by the harness is negative and
+  systematic (Haiku, identifier lists). (4) To study accuracy effects the benchmark needs harder items or weaker
+  models — open-weight runs (LM Studio, needs a restart) and DeepSeek are next.
