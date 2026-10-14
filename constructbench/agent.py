@@ -254,15 +254,13 @@ def tidy(code: str) -> str:
     return MONEY_STRING.sub(lambda m: m.group(2).replace("$", "").replace(",", ""), code)
 
 
-def run_program(code: str, timeout: int = 10, tables: list | None = None, toolkit: bool = True,
-                inputs: dict | None = None) -> tuple[dict | None, str]:
-    """Runs the program (with TABLES and the toolkit preloaded); returns (the printed answer dict, or None; the error)."""
-    code = tidy(code)
+def execute(code: str, timeout: int = 10, toolkit: bool = True, inputs: dict | None = None) -> tuple[bool, str, str]:
+    """Runs a program in the sandbox (inputs and the toolkit preloaded) -> (ran ok, stdout, error)."""
     if FORBIDDEN.search(code):
-        return None, "The program uses something that is not available (files, os, sys, eval/exec, input)."
+        return False, "", "The program uses something that is not available (files, os, sys, eval/exec, input)."
     for mod in re.findall(r"^\s*(?:from|import)\s+([A-Za-z_][\w]*)", code, re.M):
         if mod not in ALLOWED_IMPORTS:
-            return None, f"Module '{mod}' is not available; use only {', '.join(sorted(ALLOWED_IMPORTS))}."
+            return False, "", f"Module '{mod}' is not available; use only {', '.join(sorted(ALLOWED_IMPORTS))}."
     if "import json" not in code:
         code = "import json\n" + code
     if "import math" not in code:
@@ -270,16 +268,25 @@ def run_program(code: str, timeout: int = 10, tables: list | None = None, toolki
     with tempfile.TemporaryDirectory() as tmp:
         try:
             p = subprocess.run([sys.executable, "-I", "-S", "-c", RUNNER, "-", json.dumps(sorted(ALLOWED_IMPORTS))],
-                               input=json.dumps({"code": code, "inputs": {"TABLES": tables or [], **(inputs or {})},
+                               input=json.dumps({"code": code, "inputs": {"TABLES": [], **(inputs or {})},
                                                  "toolkit": TOOLKIT_SRC if toolkit else ""}),
                                capture_output=True, text=True, timeout=timeout, cwd=tmp,
                                env={"PATH": os.environ.get("PATH", ""), "PYTHONHASHSEED": "0"})
         except subprocess.TimeoutExpired:
-            return None, f"The program ran longer than {timeout} s."
+            return False, "", f"The program ran longer than {timeout} s."
     if p.returncode != 0:
         err = (p.stderr or "").strip().splitlines()
-        return None, "\n".join(err[-4:]) or f"exit {p.returncode}"
-    for line in reversed((p.stdout or "").strip().splitlines()):
+        return False, p.stdout or "", "\n".join(err[-4:]) or f"exit {p.returncode}"
+    return True, p.stdout or "", ""
+
+
+def run_program(code: str, timeout: int = 10, tables: list | None = None, toolkit: bool = True,
+                inputs: dict | None = None) -> tuple[dict | None, str]:
+    """Runs the program (with TABLES and the toolkit preloaded); returns (the printed answer dict, or None; the error)."""
+    ok, out, err = execute(tidy(code), timeout, toolkit, {"TABLES": tables or [], **(inputs or {})})
+    if not ok:
+        return None, err
+    for line in reversed(out.strip().splitlines()):
         line = line.strip()
         if line.startswith("{"):
             try:

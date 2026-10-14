@@ -1,8 +1,8 @@
 """ConstructBench command line.
 
   python -m constructbench generate --seed 1 --per-family 5 --out data/dev.jsonl
-  python -m constructbench run --tasks data/dev.jsonl --provider anthropic:claude-opus-5 --out results/opus5.jsonl
-  python -m constructbench score results/opus5.jsonl --tasks data/dev.jsonl
+  python -m constructbench run --tasks data/dev.jsonl --provider anthropic:claude-opus-5-5+code+submit --out results/opus55-harness.jsonl
+  python -m constructbench score results/opus55-harness.jsonl --tasks data/dev.jsonl
   python -m constructbench leaderboard results/*.jsonl --tasks data/dev.jsonl --out results/LEADERBOARD.md
   python -m constructbench show data/dev.jsonl vis-plan-0000 --save-images out/
 """

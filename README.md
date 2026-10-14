@@ -37,17 +37,18 @@ industry do every day — scored per domain so a result says *where* a model is 
 
 ```bash
 python -m constructbench generate --seed 1 --per-family 10 --out data/dev.jsonl
-python -m constructbench run --tasks data/dev.jsonl --provider anthropic:claude-opus-5 --out results/opus-5.jsonl
+python -m constructbench run --tasks data/dev.jsonl --provider anthropic:claude-opus-5-5 --out results/opus-5-5.jsonl               # no harness
+python -m constructbench run --tasks data/dev.jsonl --provider anthropic:claude-opus-5-5+code+submit --out results/opus-5-5-harness.jsonl  # code tool + strict answer
 python -m constructbench run --tasks data/dev.jsonl --provider local:qwen2.5-7b-instruct --out results/ours.jsonl   # LM Studio
 python -m constructbench run --tasks data/dev.jsonl --provider local:qwen2.5:7b-instruct@http://127.0.0.1:11434/v1 --out results/ours.jsonl  # Ollama
-python -m constructbench compare results/ours.jsonl results/opus-5.jsonl --tasks data/dev.jsonl --out results/COMPARE.md
+python -m constructbench compare results/opus-5-5.jsonl results/opus-5-5-harness.jsonl --tasks data/dev.jsonl --out results/COMPARE.md
 python -m constructbench leaderboard results/*.jsonl --tasks data/dev.jsonl --out results/LEADERBOARD.md
 python -m constructbench show data/dev.jsonl vis-plan-0000 --save-images out/
 python -m constructbench decontam data/dev.jsonl path/to/training/*.jsonl --ids   # before trusting a fine-tuned model's score
 python -m unittest discover -s tests
 ```
 
-Providers: `anthropic:<model>` (official SDK, adaptive thinking, `--effort`), `local:<model>[@url][+images]` (any OpenAI-compatible local server — how the Constructelligence assistant's open model is served), `command:<cmd>` (any model via
+Providers: `anthropic:<model>[+code][+submit]` (official SDK, adaptive thinking, `--effort`; `+code` = run_python sandbox tool with tables + toolkit preloaded, `+submit` = strict submit_answer tool built from the prompt's Answer keys), `local:<model>[@url][+images]` (any OpenAI-compatible local server — how the Constructelligence assistant's open model is served), `command:<cmd>` (any model via
 stdin/stdout; text only, so image tasks are skipped), `oracle` (must score 100%), `blank` (0%).
 Claude runs record refusals as refusals — no fallback model, so the score is the named model's.
 Runs are resumable and store raw responses, so a grader fix re-scores without re-running.
