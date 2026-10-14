@@ -77,6 +77,7 @@ def manifest(a, provider, tasks_path: Path) -> dict:
         "thinking": {"type": "adaptive"} if a.provider.startswith("anthropic") else None,
         "temperature": 0 if a.provider.startswith(("local:", "api:")) else None,
         "budget_usd": a.budget, "task_budget_usd": a.task_budget, "workers": a.workers,
+        "repeats": getattr(a, "repeats", 1),
         "tasks_file": str(tasks_path), "tasks_sha256": hashlib.sha256(tasks_path.read_bytes()).hexdigest(),
         "prices_per_mtok": providers.PRICES.get(getattr(provider, "model", ""), None),
         "prompts": {"system": providers.SYSTEM, "code_note": providers.CODE_NOTE, "submit_note": providers.SUBMIT_NOTE,
@@ -96,7 +97,8 @@ def cmd_run(a):
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(str(out) + ".manifest.jsonl", "a") as m:
         m.write(json.dumps(manifest(a, provider, Path(a.tasks))) + "\n")
-    run(provider, tasks, Path(a.out), workers=a.workers, budget=a.budget, budget_files=[Path(p) for p in a.budget_files])
+    run(provider, tasks, Path(a.out), workers=a.workers, budget=a.budget, budget_files=[Path(p) for p in a.budget_files],
+        repeats=a.repeats, log=lambda *x: print(*x, flush=True))
     cmd_score(argparse.Namespace(results=a.out, tasks=a.tasks, json=False))
 
 
@@ -137,35 +139,46 @@ def cmd_leaderboard(a):
 
 
 def cmd_compare(a):
-    """Two runs side by side on the tasks both answered: per-domain accuracy, the gap, and where they disagree."""
+    """Two runs on the same tasks: per-domain accuracy, and a paired test of the difference (unit = task; repeats are
+    averaged within a task). Reports the mean per-task difference with a bootstrap 95% CI, an exact sign-flip
+    permutation p-value, exact McNemar when each task ran once, run-to-run spread and cost per correct answer."""
+    from .stats import paired
     tasks = load_tasks(Path(a.tasks))
     ra, rb = regrade(Path(a.a), tasks), regrade(Path(a.b), tasks)
-    ga = {r["task_id"]: r for r in ra}
-    gb = {r["task_id"]: r for r in rb}
-    both = sorted(set(ga) & set(gb))
+    common = {r["task_id"] for r in ra} & {r["task_id"] for r in rb}
+    ra = [r for r in ra if r["task_id"] in common]
+    rb = [r for r in rb if r["task_id"] in common]
     na, nb = ra[0]["provider"] if ra else a.a, rb[0]["provider"] if rb else a.b
-    sa, sb = summarize([ga[i] for i in both]), summarize([gb[i] for i in both])
-    only_a = [i for i in both if ga[i]["grade"]["correct"] and not gb[i]["grade"]["correct"]]
-    only_b = [i for i in both if gb[i]["grade"]["correct"] and not ga[i]["grade"]["correct"]]
-    lines = [f"# {na} vs {nb}", "", f"{len(both)} tasks answered by both (of {len(tasks)} in `{Path(a.tasks).name}`).", "",
+    sa, sb = summarize(ra), summarize(rb)
+    st = paired(ra, rb)
+    lines = [f"# {na} vs {nb}", "", f"{st['tasks']} tasks answered by both (of {len(tasks)} in `{Path(a.tasks).name}`); "
+             f"runs: {st['runs_a']} vs {st['runs_b']}.", "",
              f"| Domain | {na} | {nb} | Gap |", "|---|---|---|---|"]
     def row(label, x, y):
         gap = (x["accuracy"] - y["accuracy"]) * 100
         return f"| {label} | {_pct(x['accuracy'])} ({x['correct']}/{x['n']}) | {_pct(y['accuracy'])} ({y['correct']}/{y['n']}) | {gap:+.1f} pts |"
     lines.append(row("**Overall**", sa["overall"], sb["overall"]))
     for d in DOMAINS:
-        if d in sa["domains"]:
+        if d in sa["domains"] and d in sb["domains"]:
             lines.append(row(DOMAINS[d].split(" — ")[0], sa["domains"][d], sb["domains"][d]))
     lines += ["", "| Difficulty | " + na + " | " + nb + " | Gap |", "|---|---|---|---|"]
     for d in sa["difficulty"]:
-        lines.append(row(d.capitalize(), sa["difficulty"][d], sb["difficulty"][d]))
-    lines += ["", f"Mean time per task: {na} {sa['overall']['mean_seconds']:.1f}s · {nb} {sb['overall']['mean_seconds']:.1f}s"]
-    lines += ["", f"Only {na} right: {len(only_a)} · only {nb} right: {len(only_b)} · both right: "
-              f"{sum(1 for i in both if ga[i]['grade']['correct'] and gb[i]['grade']['correct'])} · both wrong: "
-              f"{sum(1 for i in both if not ga[i]['grade']['correct'] and not gb[i]['grade']['correct'])}"]
-    skipped = sorted(set(ga) ^ set(gb))
-    if skipped:
-        lines.append(f"Not compared (answered by only one run, e.g. image tasks for a text-only model): {len(skipped)}")
+        if d in sb["difficulty"]:
+            lines.append(row(d.capitalize(), sa["difficulty"][d], sb["difficulty"][d]))
+    lo, hi = st["diff_ci95"]
+    money = lambda v: "—" if v is None else f"${v:.4f}"
+    lines += ["", "## Paired analysis (unit = task)", "",
+              f"- Mean per-task accuracy: {_pct(st['acc_a'])} vs {_pct(st['acc_b'])}; difference "
+              f"{st['diff'] * 100:+.1f} pts (bootstrap 95% CI {lo * 100:+.1f} to {hi * 100:+.1f})",
+              f"- Tasks where {na} scored higher: {st['a_better_tasks']} · {nb} higher: {st['b_better_tasks']}",
+              f"- Sign-flip permutation p = {st['p_sign_flip']:.4g}"
+              + (f" · exact McNemar p = {st['p_mcnemar']:.4g}" if st["p_mcnemar"] is not None else ""),
+              f"- Accuracy per repeat (mean ± sd): {_pct(st['rep_acc_a'][0])} ± {st['rep_acc_a'][1] * 100:.1f} vs "
+              f"{_pct(st['rep_acc_b'][0])} ± {st['rep_acc_b'][1] * 100:.1f}",
+              f"- Cost: {money(st['cost_a'])} vs {money(st['cost_b'])}; per correct answer "
+              f"{money(st['cost_per_correct_a'])} vs {money(st['cost_per_correct_b'])}",
+              f"- Mean time per run: {sa['overall']['mean_seconds']:.1f}s vs {sb['overall']['mean_seconds']:.1f}s; "
+              f"mean output tokens: {sa['overall']['mean_output_tokens'] or 0:.0f} vs {sb['overall']['mean_output_tokens'] or 0:.0f}"]
     text = "\n".join(lines) + "\n"
     if a.out:
         Path(a.out).write_text(text)
@@ -204,6 +217,7 @@ def main(argv=None):
     r.add_argument("--budget", type=float, help="USD hard stop for this run, counting --budget-files too")
     r.add_argument("--budget-files", nargs="*", default=[], help="other result files that share the budget")
     r.add_argument("--task-budget", type=float, help="USD per task: a tool loop that reaches it stops (Claude)")
+    r.add_argument("--repeats", type=int, default=1, help="run every task this many times (run-to-run variance)")
     r.set_defaults(fn=cmd_run)
     s = sub.add_parser("score"); s.add_argument("results"); s.add_argument("--tasks", required=True); s.add_argument("--json", action="store_true")
     s.set_defaults(fn=cmd_score)

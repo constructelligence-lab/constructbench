@@ -38,10 +38,10 @@ def spent(files: Iterable[Path]) -> float:
 
 
 def run(provider: Provider, tasks: list[Task], out: Path, workers: int = 4, log=print,
-        budget: float | None = None, budget_files: Iterable[Path] = ()) -> Path:
+        budget: float | None = None, budget_files: Iterable[Path] = (), repeats: int = 1) -> Path:
     """`budget` (USD) is a hard stop: a task starts only if what is spent so far (in `budget_files` + `out`), plus
     the running mean cost per task for every task in flight, stays under it. Providers that report no cost_usd
-    count as free."""
+    count as free. `repeats` runs every task that many times (rows carry `rep`), resumable per (task, rep)."""
     out.parent.mkdir(parents=True, exist_ok=True)
     done = set()
     if out.exists():
@@ -50,13 +50,14 @@ def run(provider: Provider, tasks: list[Task], out: Path, workers: int = 4, log=
                 row = json.loads(l)
                 resp = row.get("response") or {}
                 # an API failure (rate limit, outage) is not an answer: run it again; a refusal is the model's answer
+                key = (row["task_id"], row.get("rep", 0))
                 if resp.get("ok", True) or resp.get("error") == "refusal":
-                    done.add(row["task_id"])
+                    done.add(key)
                 else:
-                    done.discard(row["task_id"])
-    todo = [t for t in tasks if t.id not in done]
-    skipped = [t for t in todo if t.attachments and not provider.supports_images]
-    todo = [t for t in todo if not (t.attachments and not provider.supports_images)]
+                    done.discard(key)
+    skipped = [t for t in tasks if t.attachments and not provider.supports_images]
+    todo = [(t, rep) for rep in range(repeats) for t in tasks
+            if (t.id, rep) not in done and not (t.attachments and not provider.supports_images)]
     if skipped:
         log(f"{len(skipped)} image tasks skipped: {provider.name} takes text only")
     log(f"{provider.name}: {len(todo)} to run, {len(done)} already done")
@@ -76,14 +77,14 @@ def run(provider: Provider, tasks: list[Task], out: Path, workers: int = 4, log=
     with out.open("a") as f, ThreadPoolExecutor(max_workers=workers) as pool:
         while queue or inflight:
             while queue and len(inflight) < workers and affordable():
-                t = queue.pop(0)
-                inflight[pool.submit(provider.answer, t)] = t
+                t, rep = queue.pop(0)
+                inflight[pool.submit(provider.answer, t)] = (t, rep)
             if not inflight:
                 log(f"budget ${budget:.2f} reached (${so_far:.2f} spent): {len(queue)} tasks not run — re-run to resume")
                 break
             finished, _ = wait(inflight, return_when=FIRST_COMPLETED)
             for fut in finished:
-                t = inflight.pop(fut)
+                t, rep = inflight.pop(fut)
                 r = fut.result()
                 g = grade(t, r.text)
                 cost = (r.extra or {}).get("cost_usd")
@@ -91,12 +92,12 @@ def run(provider: Provider, tasks: list[Task], out: Path, workers: int = 4, log=
                     so_far += cost
                     costs.append(cost)
                 n += 1
-                f.write(json.dumps({"task_id": t.id, "domain": t.domain, "category": t.category,
+                f.write(json.dumps({"task_id": t.id, "rep": rep, "domain": t.domain, "category": t.category,
                                     "difficulty": t.difficulty, "provider": provider.name,
                                     "response": asdict(r), "grade": asdict(g)}) + "\n")
                 f.flush()
                 money = f"  ${cost:.3f} (total ${so_far:.2f})" if cost is not None else ""
-                log(f"  [{n}/{len(todo)}] {t.id}: {'correct' if g.correct else 'wrong' if g.parsed else 'no answer'}"
+                log(f"  [{n}/{len(todo)}] {t.id}{f' #{rep}' if repeats > 1 else ''}: {'correct' if g.correct else 'wrong' if g.parsed else 'no answer'}"
                     + (f" — {r.error}" if r.error else "") + money)
     return out
 
@@ -104,11 +105,11 @@ def run(provider: Provider, tasks: list[Task], out: Path, workers: int = 4, log=
 def regrade(results: Path, tasks: list[Task]) -> list[dict]:
     """Grade stored responses again with the current grader and task set."""
     by_id = {t.id: t for t in tasks}
-    latest: dict[str, dict] = {}
+    latest: dict[tuple, dict] = {}
     for l in results.read_text().splitlines():
         if l.strip():
             row = json.loads(l)
-            latest[row["task_id"]] = row          # a re-run of a failed call supersedes it
+            latest[(row["task_id"], row.get("rep", 0))] = row   # a re-run of a failed call supersedes it
     rows = []
     for row in latest.values():
         t = by_id.get(row["task_id"])
@@ -149,7 +150,7 @@ def summarize(rows: list[dict]) -> dict:
         sel = [r for r in rows if r["domain"] == d]
         if sel:
             out["domains"][d] = agg(sel)
-    out["difficulty"] = {d: agg([r for r in rows if r.get("difficulty") == d]) for d in ("easy", "medium", "hard", "expert")
+    out["difficulty"] = {d: agg([r for r in rows if r.get("difficulty") == d]) for d in ("easy", "medium", "hard", "expert", "extreme")
                          if any(r.get("difficulty") == d for r in rows)}
     for c in sorted({r["category"] for r in rows}):
         out["categories"][c] = agg([r for r in rows if r["category"] == c])

@@ -5,6 +5,9 @@
 #   scripts/bench.sh api:deepseek-chat@https://api.deepseek.com/v1
 #   scripts/bench.sh local:qwen3-4b-instruct-2507              # LM Studio
 #   TASKS=data/dev.jsonl ONLY=harness scripts/bench.sh ...      # ONLY=base|harness to run one side
+#   CONDITIONS="base code submit harness" EFFORTS="low medium high" REPEATS=3 scripts/bench.sh anthropic:claude-haiku-5-5
+#     CONDITIONS: base (no tools), code (+code), submit (+submit), harness (+code+submit); default "base harness"
+#     EFFORTS: Claude effort levels (file names get @<effort> unless it is high); REPEATS: runs per task
 #   BUDGET=4.50 TASK_BUDGET=0.30 LIMIT=2 scripts/bench.sh anthropic:claude-opus-5-5
 #     BUDGET: USD hard stop shared by every Claude result file in the output folder (stops starting tasks)
 #     TASK_BUDGET: USD cap per harness task;  LIMIT: only the first N tasks (a smoke test)
@@ -22,6 +25,11 @@ TASKS="${TASKS:-data/quick-families.jsonl}"
 WORKERS="${WORKERS:-4}"
 EFFORT="${EFFORT:-high}"
 ONLY="${ONLY:-both}"
+CONDITIONS="${CONDITIONS:-base harness}"
+[ "$ONLY" = base ] && CONDITIONS=base
+[ "$ONLY" = harness ] && CONDITIONS=harness
+EFFORTS="${EFFORTS:-$EFFORT}"
+REPEATS="${REPEATS:-1}"
 OUT="results/$(basename "$TASKS" .jsonl)"
 mkdir -p "$OUT"
 if [ -n "${LIMIT:-}" ]; then
@@ -39,15 +47,22 @@ money() {  # re-globbed before every run, so files written earlier in this scrip
 slug() { echo "$1" | sed -E 's#@https?://[^+]*##; s#[^A-Za-z0-9.+-]+#_#g'; }
 
 for spec in "$@"; do
-  sides=()
-  [ "$ONLY" != harness ] && sides+=("$spec")
-  [ "$ONLY" != base ] && sides+=("$(echo "$spec" | sed -E 's/(\+code|\+submit)//g')+code+submit")
-  for s in "${sides[@]}"; do
-    file="$OUT/$(slug "$s").jsonl"
-    echo "== $s -> $file"
-    m=(); while IFS= read -r x; do m+=("$x"); done < <(money)
-    "$PY" -m constructbench run --tasks "$TASKS" --provider "$s" --out "$file" --workers "$WORKERS" --effort "$EFFORT" ${m[@]+"${m[@]}"}
-    "$PY" -m constructbench score "$file" --tasks "$TASKS" | head -1
+  plain="$(echo "$spec" | sed -E 's/(\+code|\+submit)//g')"
+  for cond in $CONDITIONS; do
+    case "$cond" in
+      base) s="$plain" ;; code) s="$plain+code" ;; submit) s="$plain+submit" ;; harness) s="$plain+code+submit" ;;
+      *) echo "unknown condition $cond"; exit 1 ;;
+    esac
+    efforts="$EFFORTS"; case "$s" in anthropic:*) ;; *) efforts=high ;; esac
+    for eff in $efforts; do
+      tag=""; [ "$eff" != high ] && tag="@$eff"
+      file="$OUT/$(slug "$s")$tag.jsonl"
+      echo "== $s effort=$eff repeats=$REPEATS -> $file"
+      m=(); while IFS= read -r x; do m+=("$x"); done < <(money)
+      "$PY" -m constructbench run --tasks "$TASKS" --provider "$s" --out "$file" --workers "$WORKERS" --effort "$eff" \
+        --repeats "$REPEATS" ${m[@]+"${m[@]}"}
+      "$PY" -m constructbench score "$file" --tasks "$TASKS" | head -1
+    done
   done
 done
 
