@@ -202,3 +202,17 @@ The `ci:` agent is a different harness from `+code+submit` and is not part of th
   `35815916f558fb9b62153a6c7c8189a865bf1e7fc3d55d0b2b38d722d9e54849`. Not read before runs.
 - Plan: Haiku 5.5 pilot both conditions now (remaining Claude budget ≈ $0.46; folder cap $0.30 keeps the overall
   total ≤ $4.85). Opus/Sonnet on this set need a budget top-up. Open-weight models when LM Studio is restarted.
+- **Result — Haiku 5.5, expert set (28 tasks), effort high:**
+  | Condition | Strict | Field | Cost | Mean output tok | s/task |
+  |---|---|---|---|---|---|
+  | baseline | 26/28 (92.9%, CI 77.4–98.0%) | 95.7% | $0.088 | 5,877 | 21.3 |
+  | harness | 28/28 (100%, CI 87.9–100%) | 100% | $0.053 | 2,305 | 13.2 |
+  Harness: 1.5 code runs, 2.5 turns per task; all 28 submitted via tool; no task-budget stops.
+  **First accuracy separation between conditions** (paired: harness right on both baseline misses, wrong on none).
+  Too small for significance (exact McNemar on 2 discordant pairs: p = 0.5) — a pilot result only.
+  Baseline misses: (1) x-ledger-0001 — 4 of 5 fields right; total cost to date $1,273,264.97 vs $1,301,188.59
+  (summing ~100 ledger rows by hand); (2) x-wip-0003 — stop_reason max_tokens: the 16,000-token reply limit was
+  exhausted before an answer (17-job WIP by hand). The second is partly a setting effect (max_tokens), report it
+  as such. Here the harness was **cheaper** (−40%) and faster (−38%), unlike on the easy sets, because writing
+  code replaced long hand calculation.
+- Claude spend: expert folder $0.141; total ≈ $4.68 (client-side estimate).
