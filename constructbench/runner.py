@@ -32,7 +32,13 @@ def run(provider: Provider, tasks: list[Task], out: Path, workers: int = 4, log=
     if out.exists():
         for l in out.read_text().splitlines():
             if l.strip():
-                done.add(json.loads(l)["task_id"])
+                row = json.loads(l)
+                resp = row.get("response") or {}
+                # an API failure (rate limit, outage) is not an answer: run it again; a refusal is the model's answer
+                if resp.get("ok", True) or resp.get("error") == "refusal":
+                    done.add(row["task_id"])
+                else:
+                    done.discard(row["task_id"])
     todo = [t for t in tasks if t.id not in done]
     skipped = [t for t in todo if t.attachments and not provider.supports_images]
     todo = [t for t in todo if not (t.attachments and not provider.supports_images)]
@@ -56,11 +62,13 @@ def run(provider: Provider, tasks: list[Task], out: Path, workers: int = 4, log=
 def regrade(results: Path, tasks: list[Task]) -> list[dict]:
     """Grade stored responses again with the current grader and task set."""
     by_id = {t.id: t for t in tasks}
-    rows = []
+    latest: dict[str, dict] = {}
     for l in results.read_text().splitlines():
-        if not l.strip():
-            continue
-        row = json.loads(l)
+        if l.strip():
+            row = json.loads(l)
+            latest[row["task_id"]] = row          # a re-run of a failed call supersedes it
+    rows = []
+    for row in latest.values():
         t = by_id.get(row["task_id"])
         if t is None:
             continue

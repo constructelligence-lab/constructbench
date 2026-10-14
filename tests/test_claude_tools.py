@@ -5,8 +5,10 @@ the test checks what the loop sent (strict tools, auto tool choice, thinking kep
 """
 import json
 import sys
+import threading
 import types
 import unittest
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from types import SimpleNamespace as NS
 
 from constructbench.grading import grade
@@ -68,7 +70,7 @@ class ClaudeToolLoop(unittest.TestCase):
         p, r, msgs = self.run_with(turns)
         self.assertEqual(p.name, "anthropic:claude-opus-5-5+code+submit@high")
         self.assertTrue(grade(self.task, r.text).correct)
-        self.assertEqual(r.extra, {"turns": 2, "code_runs": 1, "submitted": True})
+        self.assertEqual(r.extra, {"turns": 2, "code_runs": 1, "submitted": True, "rejected_submits": 0})
         first, second = msgs.calls
         self.assertEqual(first["tool_choice"], {"type": "auto"})
         self.assertEqual(first["output_config"], {"effort": "high"})
@@ -106,6 +108,98 @@ class ClaudeToolLoop(unittest.TestCase):
         s = answer_schema([("a", "number"), ("b", "integer"), ("c", "string"), ("d", "array"), ("e", "date")])
         self.assertEqual([s["properties"][k]["type"] for k in "abcde"], ["number", "integer", "string", "array", "string"])
         self.assertFalse(s["additionalProperties"])
+
+
+
+
+class Script(BaseHTTPRequestHandler):
+    """An OpenAI-compatible server that replays scripted assistant messages and records each request body."""
+    replies: list = []
+    seen: list = []
+
+    def do_POST(self):
+        body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        Script.seen.append({"body": body, "auth": self.headers.get("Authorization")})
+        msg = Script.replies.pop(0)
+        out = json.dumps({"choices": [{"message": msg, "finish_reason": "tool_calls" if msg.get("tool_calls") else "stop"}],
+                          "usage": {"prompt_tokens": 50, "completion_tokens": 5}}).encode()
+        self.send_response(200); self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(out))); self.end_headers(); self.wfile.write(out)
+
+    def log_message(self, *a):
+        pass
+
+
+def call(id_, name, args):
+    return {"id": id_, "type": "function", "function": {"name": name, "arguments": json.dumps(args)}}
+
+
+class OpenAICompatibleToolLoop(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.srv = HTTPServer(("127.0.0.1", 0), Script)
+        threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
+        cls.url = f"http://127.0.0.1:{cls.srv.server_port}/v1"
+        cls.task = next(t for t in build(seed=1, per_family=1) if t.id.startswith("arch-far"))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.srv.shutdown(); cls.srv.server_close()
+
+    def test_bad_submit_is_sent_back_once_then_graded(self):
+        right = self.task.answer
+        first = dict(right); first.pop(next(iter(first)))           # one key missing
+        Script.seen, Script.replies = [], [
+            {"role": "assistant", "content": None, "reasoning_content": "r1",
+             "tool_calls": [call("c1", "run_python", {"code": "print(TABLES)"})]},
+            {"role": "assistant", "content": None, "tool_calls": [call("c2", "submit_answer", first)]},
+            {"role": "assistant", "content": None, "tool_calls": [call("c3", "submit_answer", right)]},
+        ]
+        p = make(f"local:test-model@{self.url}+code+submit")
+        self.assertEqual(p.name, "local:test-model+code+submit")
+        r = p.answer(self.task)
+        self.assertTrue(grade(self.task, r.text).correct)
+        self.assertEqual(r.extra, {"turns": 3, "code_runs": 1, "submitted": True, "rejected_submits": 1})
+        sent = Script.seen[1]["body"]["messages"]
+        self.assertEqual(sent[2]["reasoning_content"], "r1")         # thinking echoed back within the turn
+        self.assertEqual((sent[3]["role"], sent[3]["content"].strip()), ("tool", "[]"))
+        self.assertIn("missing", Script.seen[2]["body"]["messages"][-1]["content"])
+        self.assertEqual({t["function"]["name"] for t in Script.seen[0]["body"]["tools"]}, {"run_python", "submit_answer"})
+
+    def test_hosted_api_needs_its_key(self):
+        import os
+        old = {k: os.environ.pop(k, None) for k in ("LOCAL_API_KEY", "DEEPSEEK_API_KEY")}
+        try:
+            with self.assertRaises(ValueError):
+                make("api:deepseek-chat@https://api.deepseek.com/v1")
+            os.environ["DEEPSEEK_API_KEY"] = "k"
+            self.assertEqual(make("api:deepseek-chat@https://api.deepseek.com/v1+code+submit").name,
+                             "api:deepseek-chat+code+submit")
+        finally:
+            os.environ.pop("DEEPSEEK_API_KEY", None)
+            os.environ.update({k: v for k, v in old.items() if v})
+
+
+class FailedCallsAreRetried(unittest.TestCase):
+    def test_rerun_replaces_api_failure(self):
+        import tempfile
+        from pathlib import Path
+        from constructbench.providers import Oracle, Provider, Response
+        from constructbench.runner import regrade, run
+
+        class Down(Provider):
+            name = "down"
+            def answer(self, task):
+                return Response(text="", ok=False, error="rate limited")
+
+        tasks = build(seed=1, per_family=1)[:3]
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d) / "r.jsonl"
+            run(Down(), tasks, out, workers=1, log=lambda *_: None)
+            run(Oracle(), tasks, out, workers=1, log=lambda *_: None)   # same file: only the failures run again
+            rows = regrade(out, tasks)
+        self.assertEqual(len(rows), 3)
+        self.assertTrue(all(r["grade"]["correct"] for r in rows))
 
 
 if __name__ == "__main__":

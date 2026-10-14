@@ -49,7 +49,7 @@ def cmd_generate(a):
 
 def cmd_run(a):
     tasks = load_tasks(Path(a.tasks))
-    run(make(a.provider, a.effort), tasks, Path(a.out), workers=a.workers)
+    run(make(a.provider, a.effort, a.max_tokens), tasks, Path(a.out), workers=a.workers)
     cmd_score(argparse.Namespace(results=a.out, tasks=a.tasks, json=False))
 
 
@@ -153,6 +153,7 @@ def main(argv=None):
     g.set_defaults(fn=cmd_generate)
     r = sub.add_parser("run"); r.add_argument("--tasks", required=True); r.add_argument("--provider", required=True)
     r.add_argument("--out", required=True); r.add_argument("--effort", default="high"); r.add_argument("--workers", type=int, default=4)
+    r.add_argument("--max-tokens", type=int, help="per reply (default 16000 Claude, 4096 OpenAI-compatible)")
     r.set_defaults(fn=cmd_run)
     s = sub.add_parser("score"); s.add_argument("results"); s.add_argument("--tasks", required=True); s.add_argument("--json", action="store_true")
     s.set_defaults(fn=cmd_score)
