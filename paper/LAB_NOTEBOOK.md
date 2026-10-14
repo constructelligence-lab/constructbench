@@ -102,3 +102,19 @@ The `ci:` agent is a different harness from `+code+submit` and is not part of th
 - Anthropic key supplied by the user is **user-scoped**: every request returns HTTP 400 until the
   `anthropic-workspace-id` header is sent. Provider now sends it from `ANTHROPIC_WORKSPACE_ID`. **Blocked** on the
   workspace ID; no Claude request has succeeded yet, $0 spent.
+
+### 2026-10-13 (late evening)
+- Workspace ID supplied; header path works. `models.list` shows: claude-haiku-5-5, claude-sonnet-5-5,
+  claude-opus-5-5, claude-fable-5-1, claude-opus-5, claude-sonnet-5, claude-fable-5, claude-opus-4-8/4-7/4-6,
+  claude-sonnet-4-6, claude-opus-4-5, claude-haiku-4-5. Quick-set prompts total 12,280 input tokens (Opus 5.5
+  count_tokens, prompt text only).
+- **Smoke test** (`LIMIT=1`, task arch-far-0000, easy, Opus 5.5, effort high, BUDGET 4.50, TASK_BUDGET 0.40):
+  baseline correct, 337 in / 431 out tokens, $0.0100, 3.8 s; harness correct, 2 turns, 1 code run, submitted via
+  tool, 3,126 in / 242 out, $0.0133, 9.1 s. Harness input is ~10× baseline (tool descriptions + toolkit help + a
+  second turn) but cached on later turns.
+- Bug found and fixed during smoke test: `bench.sh` passed `*.manifest.jsonl` to `leaderboard` (crash, no effect
+  on results). Fixed by filtering manifests.
+- **Decision** (before full runs): measured ~$0.01–0.015 per easy task ⇒ Opus 5.5 both conditions on all 41 tasks
+  estimated at $1–3 (hard tasks think longer). Order: (1) Opus 5.5 baseline + harness, (2) Haiku 5.5 both
+  (≈1/40 of Opus price), (3) Sonnet 5.5 both with what remains. Global cap $4.50 across all Claude files, task cap
+  $0.40, 4 workers. Smoke-test records are kept (same task ids, resumed, not re-run).

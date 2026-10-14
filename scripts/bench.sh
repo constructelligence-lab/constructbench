@@ -51,5 +51,6 @@ for spec in "$@"; do
   done
 done
 
-"$PY" -m constructbench leaderboard "$OUT"/*.jsonl --tasks "$TASKS" --out "$OUT/LEADERBOARD.md" >/dev/null
+res=(); for f in "$OUT"/*.jsonl; do case "$f" in *.manifest.jsonl) ;; *) res+=("$f");; esac; done
+"$PY" -m constructbench leaderboard "${res[@]}" --tasks "$TASKS" --out "$OUT/LEADERBOARD.md" >/dev/null
 echo "leaderboard: $OUT/LEADERBOARD.md"
