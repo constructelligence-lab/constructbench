@@ -5,6 +5,9 @@
 #   scripts/bench.sh api:deepseek-chat@https://api.deepseek.com/v1
 #   scripts/bench.sh local:qwen3-4b-instruct-2507              # LM Studio
 #   TASKS=data/dev.jsonl ONLY=harness scripts/bench.sh ...      # ONLY=base|harness to run one side
+#   BUDGET=4.50 TASK_BUDGET=0.30 LIMIT=2 scripts/bench.sh anthropic:claude-opus-5-5
+#     BUDGET: USD hard stop shared by every Claude result file in the output folder (stops starting tasks)
+#     TASK_BUDGET: USD cap per harness task;  LIMIT: only the first N tasks (a smoke test)
 #
 # Keys live in ~/.config/constructbench/keys.env (chmod 600, outside the repo) — never in this repo.
 # Re-running is safe: finished tasks are skipped, API failures (rate limits, outages) are retried.
@@ -21,6 +24,15 @@ EFFORT="${EFFORT:-high}"
 ONLY="${ONLY:-both}"
 OUT="results/$(basename "$TASKS" .jsonl)"
 mkdir -p "$OUT"
+if [ -n "${LIMIT:-}" ]; then
+  head -n "$LIMIT" "$TASKS" > "$OUT/.limit.jsonl"; TASKS="$OUT/.limit.jsonl"
+fi
+shopt -s nullglob
+money() {  # re-globbed before every run, so files written earlier in this script count against BUDGET
+  [ -n "${BUDGET:-}" ] && printf '%s\n' --budget "$BUDGET" --budget-files "$OUT"/anthropic*.jsonl
+  [ -n "${TASK_BUDGET:-}" ] && printf '%s\n' --task-budget "$TASK_BUDGET"
+  true
+}
 
 [ $# -gt 0 ] || { sed -n '2,10p' "$0"; exit 1; }
 
@@ -33,7 +45,8 @@ for spec in "$@"; do
   for s in "${sides[@]}"; do
     file="$OUT/$(slug "$s").jsonl"
     echo "== $s -> $file"
-    "$PY" -m constructbench run --tasks "$TASKS" --provider "$s" --out "$file" --workers "$WORKERS" --effort "$EFFORT"
+    m=(); while IFS= read -r x; do m+=("$x"); done < <(money)
+    "$PY" -m constructbench run --tasks "$TASKS" --provider "$s" --out "$file" --workers "$WORKERS" --effort "$EFFORT" ${m[@]+"${m[@]}"}
     "$PY" -m constructbench score "$file" --tasks "$TASKS" | head -1
   done
 done

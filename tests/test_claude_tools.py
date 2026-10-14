@@ -70,7 +70,7 @@ class ClaudeToolLoop(unittest.TestCase):
         p, r, msgs = self.run_with(turns)
         self.assertEqual(p.name, "anthropic:claude-opus-5-5+code+submit@high")
         self.assertTrue(grade(self.task, r.text).correct)
-        self.assertEqual(r.extra, {"turns": 2, "code_runs": 1, "submitted": True, "rejected_submits": 0})
+        self.assertEqual(r.extra, {"turns": 2, "code_runs": 1, "submitted": True, "rejected_submits": 0, "cost_usd": 0.0012})
         first, second = msgs.calls
         self.assertEqual(first["tool_choice"], {"type": "auto"})
         self.assertEqual(first["output_config"], {"effort": "high"})
@@ -200,6 +200,53 @@ class FailedCallsAreRetried(unittest.TestCase):
             rows = regrade(out, tasks)
         self.assertEqual(len(rows), 3)
         self.assertTrue(all(r["grade"]["correct"] for r in rows))
+
+
+class Budgets(unittest.TestCase):
+    def test_task_budget_stops_a_long_tool_loop(self):
+        saved = sys.modules.get("anthropic")
+        turns = [NS(stop_reason="tool_use", usage=NS(input_tokens=10_000, output_tokens=5_000, cache_read_input_tokens=0,
+                                                     cache_creation_input_tokens=0),
+                    content=[tool_use(f"t{i}", "run_python", {"code": "print(1)"})]) for i in range(12)]
+        mod, msgs = fake_anthropic(turns)
+        sys.modules["anthropic"] = mod
+        try:
+            p = make("anthropic:claude-opus-5-5+code+submit")
+            p.max_task_cost = 0.30                       # each turn costs 0.04 + 0.10 = $0.14
+            task = next(t for t in build(seed=1, per_family=1) if t.id.startswith("arch-far"))
+            r = p.answer(task)
+        finally:
+            sys.modules.pop("anthropic", None)
+            if saved is not None:
+                sys.modules["anthropic"] = saved
+        self.assertEqual((len(msgs.calls), r.stop_reason), (3, "task_budget"))
+        self.assertAlmostEqual(r.extra["cost_usd"], 0.42)
+
+    def test_run_budget_stops_starting_tasks_and_resumes(self):
+        import tempfile
+        from pathlib import Path
+        from constructbench.providers import Provider, Response
+        from constructbench.runner import run, spent
+
+        class Priced(Provider):
+            name = "priced"
+            def __init__(self):
+                self.calls = 0
+            def answer(self, task):
+                self.calls += 1
+                return Response(text="ANSWER: " + json.dumps(task.answer), extra={"cost_usd": 1.0})
+
+        tasks = build(seed=1, per_family=1)[:10]
+        with tempfile.TemporaryDirectory() as d:
+            out, other = Path(d) / "r.jsonl", Path(d) / "other.jsonl"
+            other.write_text(json.dumps({"task_id": "x", "response": {"extra": {"cost_usd": 2.0}}}) + "\n")
+            p = Priced()
+            run(p, tasks, out, workers=4, log=lambda *_: None, budget=5.5, budget_files=[other])
+            self.assertEqual(p.calls, 3)                 # 2 already spent elsewhere + 3 x $1 < 5.5; a 4th would pass it
+            self.assertAlmostEqual(spent([out, other]), 5.0)
+            p2 = Priced()
+            run(p2, tasks, out, workers=4, log=lambda *_: None, budget=20, budget_files=[other])
+            self.assertEqual(p2.calls, 7)                # resumes where it stopped
 
 
 if __name__ == "__main__":

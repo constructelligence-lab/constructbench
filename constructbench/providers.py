@@ -102,6 +102,17 @@ class Command(Provider):
             return Response(text="", ok=False, error="timeout", seconds=time.time() - t0)
 
 
+# The harness's only words to the model besides SYSTEM and the tool descriptions (recorded in every run manifest).
+CODE_NOTE = ("Do every calculation with run_python — quantities, unit conversions, rounding, dates, schedules — "
+             "rather than working numbers out in your head. Check each result makes sense.")
+SUBMIT_NOTE = "When you are done, call submit_answer with the final values instead of writing an ANSWER line."
+RUN_PYTHON_DESC = ("Runs a Python program in a fresh sandbox and returns its stdout (or the error). Nothing persists "
+                   "between calls. Modules: {modules}; no files, network or input(). Print what you need to see.\n"
+                   "{toolkit}{loaded}")
+SUBMIT_DESC = "Submit the final answer. Call it exactly once, when you are done."
+LAST_TURN_NOTE = "Last turn: submit your final answer now."
+
+
 class Toolbox:
     """The +code / +submit harness for one task, shared by every API so each model gets the same tools and words.
 
@@ -124,21 +135,17 @@ class Toolbox:
             loaded = agent.describe_inputs(self.inputs)
             self.tools.append({
                 "name": "run_python",
-                "description": ("Runs a Python program in a fresh sandbox and returns its stdout (or the error). "
-                                "Nothing persists between calls. Modules: " + ", ".join(sorted(agent.ALLOWED_IMPORTS)) +
-                                "; no files, network or input(). Print what you need to see.\n" + toolkit_help() +
-                                ("\n" + loaded if loaded else "")),
+                "description": RUN_PYTHON_DESC.format(modules=", ".join(sorted(agent.ALLOWED_IMPORTS)),
+                                                      toolkit=toolkit_help(), loaded=("\n" + loaded if loaded else "")),
                 "schema": {"type": "object", "properties": {"code": {"type": "string"}},
                            "required": ["code"], "additionalProperties": False},
             })
-            notes.append("Do every calculation with run_python — quantities, unit conversions, rounding, dates, "
-                         "schedules — rather than working numbers out in your head. Check each result makes sense.")
+            notes.append(CODE_NOTE)
         if self.submit:
             self.tools.append({"name": "submit_answer",
-                               "description": "Submit the final answer. Call it exactly once, when you are done.",
+                               "description": SUBMIT_DESC,
                                "schema": answer_schema(self.keys)})
-            notes.append("When you are done, call submit_answer with the final values instead of writing an "
-                         "ANSWER line.")
+            notes.append(SUBMIT_NOTE)
         self.system = "\n\n".join(notes)
 
     def call(self, name: str, args: Any) -> tuple[str, bool]:
@@ -169,6 +176,22 @@ class Toolbox:
                 "rejected_submits": self.rejected}
 
 
+# USD per million tokens: (input, output, cache read). Cache writes (5-minute) bill at 1.25x input. From the
+# Anthropic price list as of 2026-10; a model not listed records no cost and a --budget cannot protect it.
+PRICES = {"claude-opus-5-5": (4.0, 20.0, 0.20), "claude-opus-5": (5.0, 25.0, 0.50),
+          "claude-sonnet-5-5": (2.0, 10.0, 0.20), "claude-sonnet-5": (2.0, 10.0, 0.20),
+          "claude-haiku-5-5": (0.10, 0.50, 0.01), "claude-fable-5-1": (10.0, 50.0, 0.25)}
+
+
+def claude_cost(model: str, usage: Any) -> float | None:
+    p = PRICES.get(model)
+    if p is None:
+        return None
+    cw = getattr(usage, "cache_creation_input_tokens", 0) or 0
+    cr = getattr(usage, "cache_read_input_tokens", 0) or 0
+    return (usage.input_tokens * p[0] + cw * p[0] * 1.25 + cr * p[2] + usage.output_tokens * p[1]) / 1e6
+
+
 class Claude(Provider):
     """Claude through the official SDK. Adaptive thinking; effort is a run setting so it is recorded with results.
 
@@ -181,6 +204,7 @@ class Claude(Provider):
     """
     supports_images = True
     max_turns = 12
+    max_task_cost: float | None = None   # USD: a tool loop that passes it stops and keeps what it has
 
     def __init__(self, model: str = "claude-opus-5-5", effort: str = "high", max_tokens: int = 16000,
                  code: bool = False, submit: bool = False):
@@ -222,9 +246,11 @@ class Claude(Provider):
         if err:
             return Response(text="", ok=False, error=err, seconds=time.time() - t0)
         text = "".join(b.text for b in msg.content if b.type == "text")
+        cost = claude_cost(self.model, msg.usage)
         return Response(text=text, stop_reason=msg.stop_reason, input_tokens=msg.usage.input_tokens,
                         output_tokens=msg.usage.output_tokens, seconds=time.time() - t0,
-                        ok=msg.stop_reason != "refusal", error="refusal" if msg.stop_reason == "refusal" else None)
+                        ok=msg.stop_reason != "refusal", error="refusal" if msg.stop_reason == "refusal" else None,
+                        extra={} if cost is None else {"cost_usd": cost})
 
     def _tool_loop(self, task: Task) -> Response:
         box = Toolbox(task, self.code, self.submit)
@@ -232,14 +258,16 @@ class Claude(Provider):
                  for t in box.tools]
         sys_blocks = [{"type": "text", "text": box.system}]
         messages: list[dict[str, Any]] = [{"role": "user", "content": self._content(task)}]
-        t0, tin, tout, turns, text, stop = time.time(), 0, 0, 0, "", None
+        t0, tin, tout, turns, text, stop, cost = time.time(), 0, 0, 0, "", None, 0.0
         while turns < self.max_turns:
             turns += 1
             msg, err = self._create(system=sys_blocks, tools=tools, tool_choice={"type": "auto"},
                                     cache_control={"type": "ephemeral"}, messages=messages)
             if err:
                 return Response(text=text, ok=False, error=err, seconds=time.time() - t0, input_tokens=tin,
-                                output_tokens=tout, extra=box.extra(turns))
+                                output_tokens=tout, extra={**box.extra(turns), "cost_usd": cost})
+            c = claude_cost(self.model, msg.usage)
+            cost = None if c is None or cost is None else cost + c
             tin += msg.usage.input_tokens + (msg.usage.cache_read_input_tokens or 0) + \
                 (msg.usage.cache_creation_input_tokens or 0)
             tout += msg.usage.output_tokens
@@ -256,11 +284,15 @@ class Claude(Provider):
             if box.submitted is not None:
                 break
             messages.append({"role": "user", "content": results})
-            if turns == self.max_turns - 1:
-                messages[-1]["content"].append({"type": "text", "text": "Last turn: submit your final answer now."})
+            if self.max_task_cost is not None and cost is not None and cost >= self.max_task_cost:
+                stop = "task_budget"
+                break
+            if turns == self.max_turns - 1 or (self.max_task_cost is not None and cost is not None
+                                               and cost >= 0.6 * self.max_task_cost):
+                messages[-1]["content"].append({"type": "text", "text": LAST_TURN_NOTE})
         return Response(text=box.finish(text), stop_reason=stop, input_tokens=tin, output_tokens=tout,
                         seconds=time.time() - t0, ok=stop != "refusal", error="refusal" if stop == "refusal" else None,
-                        extra=box.extra(turns))
+                        extra={**box.extra(turns), **({} if cost is None else {"cost_usd": cost})})
 
 
 def toolkit_help() -> str:
@@ -382,7 +414,7 @@ class Local(Provider):
             if box.submitted is not None:
                 break
             if turns == self.max_turns - 1:
-                messages.append({"role": "user", "content": "Last turn: submit your final answer now."})
+                messages.append({"role": "user", "content": LAST_TURN_NOTE})
         return Response(text=box.finish(text), stop_reason=stop, input_tokens=tin, output_tokens=tout,
                         seconds=time.time() - t0, extra=box.extra(turns))
 

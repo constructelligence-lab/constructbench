@@ -47,9 +47,56 @@ def cmd_generate(a):
         print(f"  {d:22s} {n}")
 
 
+def manifest(a, provider, tasks_path: Path) -> dict:
+    """Everything needed to report or reproduce a run: code version, model and settings, the task set's hash, the
+    harness's exact words, prices used for cost. Appended to <out>.manifest.jsonl on every invocation (resumes too)."""
+    import datetime, hashlib, platform, subprocess, sys
+    from . import providers, agent
+    from .toolkit import HELP
+
+    def git(*args):
+        try:
+            return subprocess.run(["git", *args], capture_output=True, text=True, cwd=Path(__file__).parent).stdout.rstrip("\n")
+        except OSError:
+            return None
+    try:
+        import anthropic
+        sdk = anthropic.__version__
+    except ImportError:
+        sdk = None
+    return {
+        "started_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        "command": " ".join(sys.argv),
+        "git_commit": (git("rev-parse", "HEAD") or "").strip() or None,
+        "git_dirty_files": [l[3:] for l in (git("status", "--porcelain", "--", ".") or "").splitlines()],
+        "provider_spec": a.provider, "provider_name": provider.name,
+        "model": getattr(provider, "model", None), "effort": a.effort if a.provider.startswith("anthropic") else None,
+        "max_tokens_per_reply": getattr(provider, "max_tokens", None),
+        "max_turns": getattr(provider, "max_turns", None),
+        "harness": {"code": getattr(provider, "code", False), "submit": getattr(provider, "submit", False)},
+        "thinking": {"type": "adaptive"} if a.provider.startswith("anthropic") else None,
+        "temperature": 0 if a.provider.startswith(("local:", "api:")) else None,
+        "budget_usd": a.budget, "task_budget_usd": a.task_budget, "workers": a.workers,
+        "tasks_file": str(tasks_path), "tasks_sha256": hashlib.sha256(tasks_path.read_bytes()).hexdigest(),
+        "prices_per_mtok": providers.PRICES.get(getattr(provider, "model", ""), None),
+        "prompts": {"system": providers.SYSTEM, "code_note": providers.CODE_NOTE, "submit_note": providers.SUBMIT_NOTE,
+                    "run_python_desc": providers.RUN_PYTHON_DESC, "submit_desc": providers.SUBMIT_DESC,
+                    "last_turn_note": providers.LAST_TURN_NOTE, "toolkit_help": HELP},
+        "sandbox": {"modules": sorted(agent.ALLOWED_IMPORTS), "timeout_s": 30},
+        "python": sys.version.split()[0], "anthropic_sdk": sdk, "platform": platform.platform(),
+    }
+
+
 def cmd_run(a):
     tasks = load_tasks(Path(a.tasks))
-    run(make(a.provider, a.effort, a.max_tokens), tasks, Path(a.out), workers=a.workers)
+    provider = make(a.provider, a.effort, a.max_tokens)
+    if a.task_budget is not None:
+        provider.max_task_cost = a.task_budget
+    out = Path(a.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with open(str(out) + ".manifest.jsonl", "a") as m:
+        m.write(json.dumps(manifest(a, provider, Path(a.tasks))) + "\n")
+    run(provider, tasks, Path(a.out), workers=a.workers, budget=a.budget, budget_files=[Path(p) for p in a.budget_files])
     cmd_score(argparse.Namespace(results=a.out, tasks=a.tasks, json=False))
 
 
@@ -154,6 +201,9 @@ def main(argv=None):
     r = sub.add_parser("run"); r.add_argument("--tasks", required=True); r.add_argument("--provider", required=True)
     r.add_argument("--out", required=True); r.add_argument("--effort", default="high"); r.add_argument("--workers", type=int, default=4)
     r.add_argument("--max-tokens", type=int, help="per reply (default 16000 Claude, 4096 OpenAI-compatible)")
+    r.add_argument("--budget", type=float, help="USD hard stop for this run, counting --budget-files too")
+    r.add_argument("--budget-files", nargs="*", default=[], help="other result files that share the budget")
+    r.add_argument("--task-budget", type=float, help="USD per task: a tool loop that reaches it stops (Claude)")
     r.set_defaults(fn=cmd_run)
     s = sub.add_parser("score"); s.add_argument("results"); s.add_argument("--tasks", required=True); s.add_argument("--json", action="store_true")
     s.set_defaults(fn=cmd_score)

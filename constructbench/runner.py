@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 import math
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import asdict
 from pathlib import Path
 from typing import Iterable
@@ -26,7 +26,22 @@ def save_tasks(tasks: Iterable[Task], path: Path) -> None:
     path.write_text("".join(json.dumps(t.to_json()) + "\n" for t in tasks))
 
 
-def run(provider: Provider, tasks: list[Task], out: Path, workers: int = 4, log=print) -> Path:
+def spent(files: Iterable[Path]) -> float:
+    """Dollars already recorded (response.extra.cost_usd) across result files — what a budget counts against."""
+    total = 0.0
+    for p in files:
+        if p.exists():
+            for l in p.read_text().splitlines():
+                if l.strip():
+                    total += ((json.loads(l).get("response") or {}).get("extra") or {}).get("cost_usd") or 0.0
+    return total
+
+
+def run(provider: Provider, tasks: list[Task], out: Path, workers: int = 4, log=print,
+        budget: float | None = None, budget_files: Iterable[Path] = ()) -> Path:
+    """`budget` (USD) is a hard stop: a task starts only if what is spent so far (in `budget_files` + `out`), plus
+    the running mean cost per task for every task in flight, stays under it. Providers that report no cost_usd
+    count as free."""
     out.parent.mkdir(parents=True, exist_ok=True)
     done = set()
     if out.exists():
@@ -45,17 +60,44 @@ def run(provider: Provider, tasks: list[Task], out: Path, workers: int = 4, log=
     if skipped:
         log(f"{len(skipped)} image tasks skipped: {provider.name} takes text only")
     log(f"{provider.name}: {len(todo)} to run, {len(done)} already done")
+    files = {Path(p).resolve() for p in budget_files} | {out.resolve()}
+    so_far = spent(files) if budget is not None else 0.0
+    costs: list[float] = []
+    queue, inflight, n = list(todo), {}, 0
+
+    def affordable() -> bool:
+        if budget is None:
+            return True
+        if not costs:                       # no price seen yet: one task at a time until there is one
+            return not inflight and so_far < budget
+        mean = sum(costs) / len(costs)
+        return so_far + mean * (len(inflight) + 1) < budget
+
     with out.open("a") as f, ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(provider.answer, t): t for t in todo}
-        for n, fut in enumerate(as_completed(futures), 1):
-            t = futures[fut]
-            r = fut.result()
-            g = grade(t, r.text)
-            f.write(json.dumps({"task_id": t.id, "domain": t.domain, "category": t.category, "difficulty": t.difficulty,
-                                "provider": provider.name,
-                                "response": asdict(r), "grade": asdict(g)}) + "\n")
-            f.flush()
-            log(f"  [{n}/{len(todo)}] {t.id}: {'correct' if g.correct else 'wrong' if g.parsed else 'no answer'}")
+        while queue or inflight:
+            while queue and len(inflight) < workers and affordable():
+                t = queue.pop(0)
+                inflight[pool.submit(provider.answer, t)] = t
+            if not inflight:
+                log(f"budget ${budget:.2f} reached (${so_far:.2f} spent): {len(queue)} tasks not run — re-run to resume")
+                break
+            finished, _ = wait(inflight, return_when=FIRST_COMPLETED)
+            for fut in finished:
+                t = inflight.pop(fut)
+                r = fut.result()
+                g = grade(t, r.text)
+                cost = (r.extra or {}).get("cost_usd")
+                if cost is not None:
+                    so_far += cost
+                    costs.append(cost)
+                n += 1
+                f.write(json.dumps({"task_id": t.id, "domain": t.domain, "category": t.category,
+                                    "difficulty": t.difficulty, "provider": provider.name,
+                                    "response": asdict(r), "grade": asdict(g)}) + "\n")
+                f.flush()
+                money = f"  ${cost:.3f} (total ${so_far:.2f})" if cost is not None else ""
+                log(f"  [{n}/{len(todo)}] {t.id}: {'correct' if g.correct else 'wrong' if g.parsed else 'no answer'}"
+                    + (f" — {r.error}" if r.error else "") + money)
     return out
 
 
