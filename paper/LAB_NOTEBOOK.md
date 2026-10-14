@@ -270,3 +270,40 @@ The `ci:` agent is a different harness from `+code+submit` and is not part of th
   `python -m constructbench compare <harness file> <base file> --tasks <set>`.
 - **Decision rules fixed in advance:** no harness or task changes between arms; any harness revision (e.g. the
   identifier-list fix) is a new labelled version run on all arms; budget-stopped tasks are reported as not run.
+
+### 2026-10-14 (later) — hidden rules, chained tasks, report, DeepSeek
+- **DeepSeek:** the key the user supplied returns `401 Authentication Fails … invalid` on `GET /models` (a valid key
+  without credit returns 402 instead). No DeepSeek run. OpenAI-compatible runs now record the server's raw usage
+  totals (cache hits, reasoning tokens) per run so cost can be computed afterwards from the provider's price list
+  (commit 536c6c2).
+- **Hidden-rule families** (commit ebf33e1, frozen before any model run), difficulty `extreme`:
+  - pay_app_contract: the prompt says only "under the payment terms of the subcontract below"; the deciding terms are
+    in a numbered excerpt among 4–6 distractor clauses (insurance limits, 150% dispute withholding, termination 5%…).
+    Per-task variants: retainage scheme (10%→5% step at 50% / flat 5% incl. stored / 10% on work, none on stored) ×
+    stored materials (all payable / off site only if bonded and approved). Unsigned PCO lines excluded per §9.2.
+  - delay_contract: notice period (7/10/14/21 days), concurrency (excusable-not-compensable vs contractor bears),
+    weather excusable only beyond Exhibit W's anticipated days per month, extended GC compensation per owner-only day,
+    LD per day with a cap of 0.5/1/2/5% of the Contract Sum (cap binds in ≈36% of tasks; range tightened before
+    freezing because at 3–10% it bound in only ≈2.5%).
+  - Validation reads the rules out of the excerpt text (the test never sees the variant): all answers agree; all three
+    retainage schemes and all four concurrency × cap-binding combinations occur.
+- **Chained family** chained_concrete: takeoff (slab, footings, pads, waste, half-yard ordering) → direct cost
+  (concrete, rebar, formwork contact area, crew) → bid (GC, OH, profit, bond compounded) → duration (forms, pours at
+  CY/day rounded up, cure, strip) → cash flow (20-day months, retainage, one-month pay lag) → peak deficit.
+  `chain_values(params, overrides)` recomputes downstream stages from a model's own upstream answers, for error-
+  propagation analysis (first error vs carried error). Rounding knife-edges redrawn.
+- **Evaluation set:** `data/rules-chain-s20261017.jsonl`, 8 per family = 24 tasks, SHA-256
+  `7d09e40573b06056daf18399958574f89c9ac011ccec4f3aec41f3a6babbfd44`. Not read.
+- **Report command** (`python -m constructbench report`, `constructbench/report.py`): from every results folder
+  writes `paper/report/` — report.md, runs.csv, paired.csv, failures.csv and SVG figures (accuracy by model × condition
+  with Wilson CIs per set; accuracy vs prompt-length bins per model; failure categories; cost per task vs accuracy with
+  the non-dominated frontier). Figures follow the dataviz method: categorical palette validated with
+  validate_palette.js (4 condition colours: all checks pass; contrast relief via value labels + tables), legends +
+  direct labels, `<title>` hover text per mark; rendered and inspected (label collisions, clipped labels, misleading
+  rounded tick labels found and fixed). Failure classifier categories, in priority: prose in an ID list, numeric error
+  > 1%, wrong non-numeric value, numeric near miss ≤ 1%, out of tokens, unparseable, task-budget stop, refusal, API
+  error. On existing results it reproduces the hand analysis exactly (2 × prose-in-ID-list for Haiku harness;
+  1 numeric error + 1 out-of-tokens for Haiku baseline on expert).
+- Added to the pre-registered plan: rules-chain (24 tasks) joins expert84 + extreme32 → 140 tasks; Haiku arm A
+  ≈ $5–6 at the measured per-run cost. Chained-task secondary outcome: share of downstream errors that are carried
+  (correct given the model's own upstream value) vs new.

@@ -1,0 +1,17 @@
+set,model,condition,effort,runs,format: prose in ID list,numeric error (>1%),near miss (≤1%),wrong value,no answer: out of tokens,no answer: unparseable,task-budget stop,refusal,API error
+expert-s20261015,claude-haiku-5-5,harness,high,28,0,0,0,0,0,0,0,0,0
+expert-s20261015,claude-haiku-5-5,base,high,28,0,1,0,0,1,0,0,0,0
+extreme-smoke,claude-haiku-5-5,harness,high,4,0,0,0,0,0,0,0,0,0
+extreme-smoke,claude-haiku-5-5,base,high,4,0,0,0,0,0,0,0,0,0
+fresh-s20261014,claude-haiku-5-5,harness,high,51,1,0,0,0,0,0,0,0,0
+fresh-s20261014,claude-haiku-5-5,base,high,51,0,0,0,0,0,0,0,0,0
+fresh-s20261014,claude-opus-5-5,harness,high,48,0,0,0,0,0,0,0,0,0
+fresh-s20261014,claude-opus-5-5,base,high,51,0,0,0,0,0,0,0,0,0
+fresh-s20261014,claude-sonnet-5-5,harness,high,51,0,0,0,0,0,0,0,0,0
+fresh-s20261014,claude-sonnet-5-5,base,high,51,0,0,0,0,0,0,0,0,0
+quick-families,claude-haiku-5-5,harness,high,41,1,0,0,0,0,0,0,0,0
+quick-families,claude-haiku-5-5,base,high,41,0,0,0,0,0,0,0,0,0
+quick-families,claude-opus-5-5,harness,high,41,0,0,0,0,0,0,0,0,0
+quick-families,claude-opus-5-5,base,high,41,0,0,0,0,0,0,0,0,0
+quick-families,claude-sonnet-5-5,harness,high,41,0,0,0,0,0,0,0,0,0
+quick-families,claude-sonnet-5-5,base,high,41,0,0,0,0,0,0,0,0,0

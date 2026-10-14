@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 876 376" width="876" height="376" role="img" font-family="Inter, Helvetica, Arial, sans-serif" font-size="12">
+<title>Accuracy vs task size</title>
+<desc>Small multiples per model: accuracy by prompt-length bin.</desc>
+<rect width="876" height="376" fill="#fcfcfb"/>
+<text x="56.0" y="22.0" font-size="15" fill="#0b0b0b" text-anchor="start" font-weight="600">Accuracy vs task size</text>
+<text x="56.0" y="40.0" font-size="12" fill="#8a8984" text-anchor="start" font-weight="normal">Prompt length in characters, pooled over task sets · points with fewer than 3 runs omitted</text>
+<line x1="56" x2="286" y1="296.0" y2="296.0" stroke="#e6e5e0"/>
+<text x="48.0" y="300.0" font-size="11" fill="#8a8984" text-anchor="end" font-weight="normal">0%</text>
+<line x1="56" x2="286" y1="196.0" y2="196.0" stroke="#e6e5e0"/>
+<text x="48.0" y="200.0" font-size="11" fill="#8a8984" text-anchor="end" font-weight="normal">50%</text>
+<line x1="56" x2="286" y1="96.0" y2="96.0" stroke="#e6e5e0"/>
+<text x="48.0" y="100.0" font-size="11" fill="#8a8984" text-anchor="end" font-weight="normal">100%</text>
+<text x="70.0" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">&lt;2k</text>
+<text x="120.5" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">2–4k</text>
+<text x="171.0" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">4–8k</text>
+<text x="221.5" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">8–16k</text>
+<text x="272.0" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">≥16k</text>
+<text x="171.0" y="66.0" font-size="12" fill="#0b0b0b" text-anchor="middle" font-weight="600">claude-haiku-5-5</text>
+<path d="M70.0,96.0 L120.5,105.1 L221.5,146.0" fill="none" stroke="#eb6834" stroke-width="2"/>
+<circle cx="70.0" cy="96.0" r="4.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>claude-haiku-5-5 · No harness · &lt;2k chars: 100.0% of 96 runs</title></circle>
+<circle cx="120.5" cy="105.1" r="4.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>claude-haiku-5-5 · No harness · 2–4k chars: 95.5% of 22 runs</title></circle>
+<circle cx="221.5" cy="146.0" r="4.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>claude-haiku-5-5 · No harness · 8–16k chars: 75.0% of 4 runs</title></circle>
+<text x="221.5" y="164.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">No harness</text>
+<path d="M70.0,100.2 L120.5,96.0 L221.5,96.0" fill="none" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="70.0" cy="100.2" r="4.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>claude-haiku-5-5 · Harness (code + submit) · &lt;2k chars: 97.9% of 96 runs</title></circle>
+<circle cx="120.5" cy="96.0" r="4.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>claude-haiku-5-5 · Harness (code + submit) · 2–4k chars: 100.0% of 22 runs</title></circle>
+<circle cx="221.5" cy="96.0" r="4.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>claude-haiku-5-5 · Harness (code + submit) · 8–16k chars: 100.0% of 4 runs</title></circle>
+<text x="221.5" y="86.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">Harness</text>
+<line x1="326" x2="556" y1="296.0" y2="296.0" stroke="#e6e5e0"/>
+<line x1="326" x2="556" y1="196.0" y2="196.0" stroke="#e6e5e0"/>
+<line x1="326" x2="556" y1="96.0" y2="96.0" stroke="#e6e5e0"/>
+<text x="340.0" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">&lt;2k</text>
+<text x="390.5" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">2–4k</text>
+<text x="441.0" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">4–8k</text>
+<text x="491.5" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">8–16k</text>
+<text x="542.0" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">≥16k</text>
+<text x="441.0" y="66.0" font-size="12" fill="#0b0b0b" text-anchor="middle" font-weight="600">claude-opus-5-5</text>
+<circle cx="340.0" cy="96.0" r="4.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>claude-opus-5-5 · No harness · &lt;2k chars: 100.0% of 91 runs</title></circle>
+<text x="340.0" y="114.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">No harness</text>
+<circle cx="340.0" cy="96.0" r="4.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>claude-opus-5-5 · Harness (code + submit) · &lt;2k chars: 100.0% of 88 runs</title></circle>
+<text x="340.0" y="86.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">Harness</text>
+<line x1="596" x2="826" y1="296.0" y2="296.0" stroke="#e6e5e0"/>
+<line x1="596" x2="826" y1="196.0" y2="196.0" stroke="#e6e5e0"/>
+<line x1="596" x2="826" y1="96.0" y2="96.0" stroke="#e6e5e0"/>
+<text x="610.0" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">&lt;2k</text>
+<text x="660.5" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">2–4k</text>
+<text x="711.0" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">4–8k</text>
+<text x="761.5" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">8–16k</text>
+<text x="812.0" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">≥16k</text>
+<text x="711.0" y="66.0" font-size="12" fill="#0b0b0b" text-anchor="middle" font-weight="600">claude-sonnet-5-5</text>
+<circle cx="610.0" cy="96.0" r="4.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>claude-sonnet-5-5 · No harness · &lt;2k chars: 100.0% of 91 runs</title></circle>
+<text x="610.0" y="114.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">No harness</text>
+<circle cx="610.0" cy="96.0" r="4.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>claude-sonnet-5-5 · Harness (code + submit) · &lt;2k chars: 100.0% of 91 runs</title></circle>
+<text x="610.0" y="86.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">Harness</text>
+<rect x="56" y="353" width="10" height="10" rx="2" fill="#eb6834"/>
+<text x="70.0" y="362.0" font-size="12" fill="#52514e" text-anchor="start" font-weight="normal">No harness</text>
+<rect x="146.0" y="353" width="10" height="10" rx="2" fill="#2a78d6"/>
+<text x="160.0" y="362.0" font-size="12" fill="#52514e" text-anchor="start" font-weight="normal">Harness (code + submit)</text>
+</svg>

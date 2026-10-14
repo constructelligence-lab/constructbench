@@ -185,6 +185,12 @@ def cmd_compare(a):
     print(text)
 
 
+def cmd_report(a):
+    from .report import build
+    dirs = [Path(d) for d in a.results] or sorted(p for p in Path("results").iterdir() if p.is_dir())
+    print(f"report: {build(dirs, Path(a.data), Path(a.out))}")
+
+
 def cmd_show(a):
     t = next((t for t in load_tasks(Path(a.tasks)) if t.id == a.id), None)
     if not t:
@@ -225,6 +231,10 @@ def main(argv=None):
     lb.set_defaults(fn=cmd_leaderboard)
     cp = sub.add_parser("compare"); cp.add_argument("a"); cp.add_argument("b"); cp.add_argument("--tasks", required=True); cp.add_argument("--out")
     cp.set_defaults(fn=cmd_compare)
+    rp = sub.add_parser("report", help="paper-ready tables (md/csv) and SVG figures from result folders")
+    rp.add_argument("results", nargs="*", help="result folders (default: every folder under results/)")
+    rp.add_argument("--data", default="data"); rp.add_argument("--out", default="paper/report")
+    rp.set_defaults(fn=cmd_report)
     sh = sub.add_parser("show"); sh.add_argument("tasks"); sh.add_argument("id"); sh.add_argument("--save-images")
     sh.set_defaults(fn=cmd_show)
     dc = sub.add_parser("decontam", help="flag benchmark items that appear in a training corpus (numbers kept)")
