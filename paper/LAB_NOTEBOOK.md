@@ -216,3 +216,57 @@ The `ci:` agent is a different harness from `+code+submit` and is not part of th
   as such. Here the harness was **cheaper** (−40%) and faster (−38%), unlike on the easy sets, because writing
   code replaced long hand calculation.
 - Claude spend: expert folder $0.141; total ≈ $4.68 (client-side estimate).
+
+### 2026-10-14 — study infrastructure for improvements 1, 2, 3, 4, 5, 7
+- **Repeats** (commit 7d9a9e9): `run --repeats N`; rows carry `rep`; resumable per (task, rep).
+- **Statistics** (`constructbench/stats.py`, `compare`): unit of analysis = task; with repeats a task's score is the
+  share of its runs fully correct. Reported: mean per-task difference with percentile bootstrap 95% CI (10,000
+  resamples over tasks, seed 0); two-sided sign-flip permutation p (exact up to 20 non-zero differences, else 20,000
+  Monte Carlo draws, seed 0); exact McNemar p when every task ran once; accuracy per repeat (mean ± sd); total cost and
+  cost per correct answer. Tested against known values (`tests/test_stats.py`).
+- **Ablations / effort sweep:** `bench.sh` `CONDITIONS` = base (no tools), code (+code), submit (+submit), harness
+  (+code+submit); `EFFORTS` = Claude effort levels (result files tagged `@low`/`@medium`); `REPEATS`.
+- **Harder tasks — extreme tier** (commit ee5a968, frozen before any model run): 4 families, difficulty `extreme`:
+  co_reconciliation (contracts; shuffled CO log with revisions, statuses, owner directive priced from T&M tickets,
+  billing vs approved value), addendum_takeoff (estimating; 15–22 rooms in feet-inches, three overriding addenda incl.
+  a deleted room, waste then package rounding, base less doors, sales tax), ledger_xl (finance; 280–400 rows, three
+  jobs, duplicates, voids, credit memos, reclass journals), cashflow_forecast (finance; schedule-spread costs, payment
+  split, markup, retainage, payment lag, retainage release). `tests/test_extreme.py` re-derives every answer from the
+  prompt text (seeds 1–3 × 6): all agree (one test-side parsing bug fixed; no generator change needed).
+- **Larger evaluation sets:**
+  - `data/expert84-s20261015.jsonl`: 12 per expert family = 84 tasks (scheduling 12, finance 36, civil 12,
+    contracts 12, preconstruction 12), 310,219 prompt characters, SHA-256
+    `01d27f698b405d2bc9d0d55950abeccdc902a2a110783fd0aff1903d9fc9d803`. Contains the 28-task pilot set exactly
+    (verified byte for byte), so pilot runs carry over. Caveat: the reference answers of the two pilot misses
+    (x-ledger-0001, x-wip-0003) were read during error analysis.
+  - `data/extreme-s20261016.jsonl`: 8 per extreme family = 32 tasks (contracts 8, estimating 8, finance 16),
+    264,512 characters, SHA-256 `e17c8226c0f2c478fe16aeb2ed227ffdea201c0c5358dc82a67dd7dc202b0b1d`. Not read.
+  - `data/extreme-smoke.jsonl`: the first task of each extreme family (4 tasks, a subset of the 32) for a smoke test.
+- **Smoke test — Haiku 5.5, extreme-smoke (4 tasks), effort high:** baseline 4/4, harness 4/4; cost $0.0163 vs
+  $0.0097; mean output tokens 7,245 vs 2,461; 26.4 vs 15.3 s/run. No errors, no budget stops. These 4 tasks are now
+  seen (results only; prompts not read).
+- Claude spend: ≈ $4.71 total (client-side estimate). Remaining budget ≈ $0.29 — **the study below is not run.**
+
+### Pre-registered plan for the full study (written before any of these runs)
+- **Tasks:** expert84 + extreme32 = 116 tasks.
+- **Primary outcome:** per-task strict accuracy, harness (+code+submit) minus baseline, paired by task; report the
+  mean difference with bootstrap 95% CI and sign-flip p; per tier (expert, extreme) and pooled.
+- **Secondary:** cost per correct answer, total cost, output tokens, seconds per run; field score; failure categories
+  (wrong arithmetic, unparsed answer, max_tokens, task-budget stop, format/identifier errors).
+- **Arms and estimated cost** (from measured per-run costs: Haiku ≈ $0.003/run on these tiers; Sonnet ≈ 12× and Opus
+  ≈ 30× Haiku, ratios measured on the quick set):
+  | Arm | Model | Conditions | Effort | Repeats | Runs | Est. cost |
+  |---|---|---|---|---|---|---|
+  | A main + ablation | Haiku 5.5 | base, code, submit, harness | high | 3 | 1,392 | ≈ $4–5 |
+  | B effort sweep | Haiku 5.5 | base, harness | low, medium | 1 | 464 | ≈ $1 |
+  | C | Sonnet 5.5 | base, harness | high | 1 | 232 | ≈ $8 |
+  | D | Opus 5.5 | base, harness | high | 1 | 232 | ≈ $20 |
+  | E | Qwen2.5-1.5B, Qwen3-4B (LM Studio) | all four | — (temperature 0) | 1 | 928 | $0 (slow: Qwen3-4B ≈ minutes/task) |
+  | F | DeepSeek (API) | base, harness | — | 1 | 232 | < $1 |
+- **Commands:**
+  `TASKS=data/expert84-s20261015.jsonl CONDITIONS="base code submit harness" REPEATS=3 BUDGET=… scripts/bench.sh anthropic:claude-haiku-5-5`
+  (and the same with `TASKS=data/extreme-s20261016.jsonl`); arm B adds `EFFORTS="low medium" CONDITIONS="base harness"`;
+  arms C/D `scripts/bench.sh anthropic:claude-sonnet-5-5` / `anthropic:claude-opus-5-5`; comparisons with
+  `python -m constructbench compare <harness file> <base file> --tasks <set>`.
+- **Decision rules fixed in advance:** no harness or task changes between arms; any harness revision (e.g. the
+  identifier-list fix) is a new labelled version run on all arms; budget-stopped tasks are reported as not run.
