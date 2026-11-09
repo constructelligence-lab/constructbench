@@ -2,6 +2,7 @@
 import itertools
 import math
 import random
+import re
 import unittest
 
 from constructbench import registry
@@ -94,6 +95,64 @@ class Robotics(unittest.TestCase):
             a = t.answer
             self.assertEqual(a["faster"], "robot" if a["robot_days"] < a["crew_days"] else "crew")
             self.assertEqual(a["bricks"], math.ceil(a["net_wall_area_sf"] * 6.86))
+
+    def test_fleet_allocation_from_prompt(self):
+        """Autonomous fleet: the cheapest *feasible* plan, re-derived by exhaustive search from the prompt — and the
+        plan that ignores the range limit must be cheaper, since that is the trap the item exists for."""
+        for t in fam("fleet_allocation"):
+            p = t.prompt
+            head = next(l for l in p.splitlines() if l.startswith("| Robot |"))
+            tasks = [c.strip() for c in head.strip().strip("|").split("|")][2:]
+            table = [[c.strip() for c in row.strip().strip("|").split("|")] for row in p.splitlines()
+                     if row.startswith("|")]
+            table = [row for row in table if re.fullmatch(r"R\d+", row[0])]
+            range_of = {row[0]: int(row[1]) for row in table}
+            dist = {(row[0], tasks[k]): int(row[k + 2]) for row in table for k in range(len(tasks))}
+            robots = [row[0] for row in table]
+
+            def total(combo, use_range=True):
+                if use_range and any(dist[(r, tt)] > range_of[r] for r, tt in zip(combo, tasks)):
+                    return None
+                return sum(dist[(r, tt)] for r, tt in zip(combo, tasks))
+
+            best_key, best_map = None, None
+            for combo in itertools.permutations(robots, len(tasks)):
+                tot = total(combo)
+                if tot is None:
+                    continue
+                key = (tot, sorted(f"{r}-{tt}" for r, tt in zip(combo, tasks)))
+                if best_key is None or key < best_key:
+                    best_key, best_map = key, dict(zip(combo, tasks))
+            self.assertEqual(sorted(t.answer["assignment"]), sorted(f"{r}-{tt}" for r, tt in best_map.items()), t.id)
+            self.assertEqual(t.answer["total_distance_m"], best_key[0], t.id)
+            self.assertEqual(t.answer["makespan_m"], max(dist[(r, tt)] for r, tt in best_map.items()), t.id)
+            self.assertEqual(t.answer["idle_robots"], sorted(r for r in robots if r not in best_map), t.id)
+            unbounded = min(total(c, use_range=False) for c in itertools.permutations(robots, len(tasks)))
+            self.assertGreater(best_key[0], unbounded, t.id)      # ignoring rule 2 gives a cheaper plan
+
+    def test_agv_safety_envelope_from_prompt(self):
+        """Autonomous vehicle safety envelope: payload-reduced deceleration, the tolerance in the right units, and
+        the speed solved from the zone rather than scaled."""
+        for t in fam("agv_safety_envelope"):
+            p = t.prompt
+            one = lambda pat: float(re.search(pat, p).group(1))   # noqa: E731
+            rated = one(r"Rated deceleration ([\d.]+) m/s")
+            loss = one(r"costs ([\d.]+)% of that deceleration") / 100
+            payload = one(r"payload of (\d+) kg")
+            T = one(r"actuation\) is ([\d.]+) s")
+            K = one(r"constant is K = ([\d.]+) m/s")
+            C = one(r"tolerance is C = (\d+) mm")
+            zone = one(r"reaches (\d+) mm")
+            v = one(r"under consideration is ([\d.]+) m/s")
+            a = rated * (1 - loss * payload)
+            gap = zone / 1000.0 - K * T - C / 1000.0
+            self.assertAlmostEqual(t.answer["deceleration_loaded_mps2"], round(a, 4), places=4, msg=t.id)
+            self.assertAlmostEqual(t.answer["stopping_distance_mm"],
+                                   round((K * T + v * v / (2 * a) + C / 1000.0) * 1000, 1), places=1, msg=t.id)
+            self.assertEqual(t.answer["permitted"],
+                             "yes" if zone >= t.answer["stopping_distance_mm"] else "no", t.id)
+            self.assertAlmostEqual(t.answer["max_permitted_speed_mps"],
+                                   round(math.sqrt(2 * a * gap), 4), places=3, msg=t.id)
 
 
 if __name__ == "__main__":

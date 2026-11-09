@@ -137,6 +137,168 @@ class Expert(unittest.TestCase):
             self.assertAlmostEqual(t.answer["current_payment_due"], G - ret - prev, places=2)
         self.assertEqual(saw_rate, {0.05, 0.10})               # both sides of the 50% rule occur
 
+    def test_pay_app_hard_from_prompt(self):
+        """Second level: the interacting traps must be re-derivable from the prompt alone — unapproved stored
+        materials out of every total (rule 3), pending billings already inside the previous certificates (rule 6),
+        and a deductive change order carried with its sign (rule 4)."""
+        saw_rate, saw_unapproved = set(), 0
+        for t in fam("pay_app_certification_hard"):
+            errs, excl, unapproved = [], [], []
+            sumC = sumDE = sumF = 0.0
+            for item, desc, c, d, e, f, ok, g, h in rows(t.prompt, "| Item |"):
+                c, d, e, f, g, h = map(dollars, (c, d, e, f, g, h))
+                if "pending" in desc:
+                    excl.append(item)
+                    continue
+                if g != d + e + f or h != c - (d + e + f):
+                    errs.append(item)
+                if f > 0 and ok == "N":
+                    unapproved.append(item)
+                sumC += c
+                sumDE += d + e
+                sumF += f if ok == "Y" else 0.0
+            sumG = sumDE + sumF
+            rate = 0.05 if sumG / sumC > 0.5 else 0.10
+            saw_rate.add(rate)
+            prev = dollars(re.search(r"Previous certificates for payment total (\$[\-\d,]+)", t.prompt).group(1))
+            on_pending = dollars(re.search(r"already includes (\$[\-\d,]+) billed on the pending items",
+                                           t.prompt).group(1))
+            prev_adj = prev - on_pending
+            ret = rate * sumDE + 0.10 * sumF
+            saw_unapproved += 1 if unapproved else 0
+            self.assertEqual(set(t.answer["error_lines"]), set(errs), t.id)
+            self.assertEqual(set(t.answer["excluded_lines"]), set(excl), t.id)
+            self.assertEqual(set(t.answer["unapproved_stored_lines"]), set(unapproved), t.id)
+            self.assertAlmostEqual(t.answer["corrected_total_completed_stored"], sumG, places=2)
+            self.assertAlmostEqual(t.answer["retainage"], ret, places=2)
+            self.assertAlmostEqual(t.answer["previous_certificates_adjusted"], prev_adj, places=2)
+            self.assertAlmostEqual(t.answer["current_payment_due"], sumG - ret - prev_adj, places=2)
+        self.assertEqual(saw_unapproved, len(fam("pay_app_certification_hard")))   # every item carries the trap
+        self.assertEqual(saw_rate, {0.05, 0.10})                                   # the knife-edge is exercised
+
+    def test_delay_tia_hard_from_prompt(self):
+        """Second level: the monthly weather allowance, the two notice periods and the two caps must all be
+        re-derivable from the prompt text alone."""
+        capped_ld = capped_gc = 0
+        for t in fam("delay_tia_hard"):
+            p = t.prompt
+            original = dt.date.fromisoformat(re.search(r"contract completion date (\d{4}-\d{2}-\d{2})", p).group(1))
+            actual = dt.date.fromisoformat(re.search(r"Actual substantial completion: (\d{4}-\d{2}-\d{2})", p).group(1))
+            rate = dollars(re.search(r"liquidated damages (\$[\d,]+) per calendar day", p).group(1))
+            cap_pct = float(re.search(r"capped at ([\d.]+)% of", p).group(1))
+            sum_ = dollars(re.search(r"contract sum (\$[\d,]+)", p).group(1))
+            gc_rate = dollars(re.search(r"recoverable at (\$[\d,]+) per compensable day", p).group(1))
+            gc_cap = dollars(re.search(r"capped at (\$[\d,]+)\. Actual", p).group(1))
+            anticipated = {m: int(n) for m, n in
+                           re.findall(r"(\d{4}-\d{2}) (\d+)", re.search(r"by calendar month: ([^.]+)\.", p).group(1))}
+            live = []
+            for _e, _desc, who, s, f, crit, notice in rows(p, "| Event |"):
+                s, f, notice = (dt.date.fromisoformat(x) for x in (s, f, notice))
+                if crit == "Yes" and (who == "Contractor" or (notice - s).days <= (21 if who == "Owner" else 10)):
+                    live.append((who, s, f))                    # rule 2: two notice periods
+            exc = comp = disallowed = 0
+            used: dict[str, int] = {}
+            d = min(w[1] for w in live)
+            last = max(w[2] for w in live)
+            while d <= last:
+                who = {w[0] for w in live if w[1] <= d <= w[2]}
+                if who and who != {"Contractor"}:
+                    if who == {"Owner"}:
+                        exc += 1
+                        comp += 1
+                    elif who == {"Weather"}:                    # rule 4: the monthly allowance
+                        m = d.strftime("%Y-%m")
+                        used[m] = used.get(m, 0) + 1
+                        if used[m] > anticipated[m]:
+                            exc += 1
+                        else:
+                            disallowed += 1
+                    else:
+                        exc += 1
+                d += dt.timedelta(days=1)
+            extended = original + dt.timedelta(days=exc)
+            ld_days = max(0, (actual - extended).days)
+            ld_amount = min(ld_days * rate, sum_ * cap_pct / 100.0)           # rule 6: capped
+            gc_cost = min(comp * gc_rate, gc_cap)                             # rule 7: capped
+            capped_ld += 1 if ld_days * rate > sum_ * cap_pct / 100.0 else 0
+            capped_gc += 1 if comp * gc_rate > gc_cap else 0
+            self.assertEqual(t.answer["extension_days"], exc, t.id)
+            self.assertEqual(t.answer["compensable_days"], comp, t.id)
+            self.assertEqual(t.answer["extended_completion_date"], extended.isoformat(), t.id)
+            self.assertEqual(t.answer["ld_days"], ld_days, t.id)
+            self.assertAlmostEqual(t.answer["ld_amount"], round(ld_amount, 2), places=2)
+            self.assertAlmostEqual(t.answer["extended_general_conditions_cost"], round(gc_cost, 2), places=2)
+            self.assertEqual(t.answer["weather_days_not_excusable"], disallowed, t.id)
+        self.assertGreater(capped_ld, 0)      # the liquidated-damages cap binds on at least one item
+        self.assertGreater(capped_gc, 0)      # and so does the general-conditions cap
+
+    def test_bid_leveling_hard_from_prompt(self):
+        """Second level: the rejected non-responsive bid and the unit-price correction must both be re-derived from
+        the prompt, and each must actually change the top two — a model that misses either names a different winner."""
+        num = {w: k for k, w in enumerate(["zero", "one", "two", "three", "four", "five", "six", "seven", "eight",
+                                           "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen",
+                                           "sixteen", "seventeen", "eighteen", "nineteen"])}
+        num.update({w: 10 * k for k, w in enumerate(["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy",
+                                                     "eighty", "ninety"]) if w})
+
+        def parse_words(text):
+            total = cur = 0
+            for w in text.replace("-", " ").split():
+                if w in num:
+                    cur += num[w]
+                elif w == "hundred":
+                    cur *= 100
+                elif w in ("thousand", "million"):
+                    total += cur * (1000 if w == "thousand" else 1_000_000)
+                    cur = 0
+            return total + cur
+
+        for t in fam("bid_leveling_expert_hard"):
+            p = t.prompt
+            bond = float(re.search(r"bond has ([\d.]+)% added", p).group(1)) / 100
+            mandatory = re.search(r"every one\): (.+)", p).group(1).split(", ")
+            forms = re.findall(r"- (.+?): base bid in figures (\$[\d,]+); in words \"(.+?) dollars\"(.*?); bond "
+                               r"(included|NOT included); .*?: add (\$[\d,]+)", p)
+            table = rows(p, "| Scope item |")
+            plugs = {r[0]: dollars(r[1]) for r in table}
+            names = [f[0] for f in forms]
+
+            def leveled(apply2=True, apply3=True):
+                out, rejected = {}, []
+                for name, figures, wds, mid, b, alt in forms:
+                    col = names.index(name) + 2
+                    sts = {r[0]: r[col] for r in table}
+                    if apply3 and any(sts[m] == "Excl" for m in mandatory):
+                        rejected.append(name)
+                        continue
+                    base = parse_words(wds)
+                    lt = re.search(r"line items total (\$[\d,]+)", mid)
+                    if apply2 and lt and "unit prices govern" in mid:
+                        base = dollars(lt.group(1))
+                    total = base + dollars(alt)
+                    for it, st in sts.items():
+                        if st == "Excl":
+                            total += plugs[it]
+                        elif st.startswith("Allow"):
+                            total += max(0.0, plugs[it] - dollars(st.split("$")[1]))
+                    if b == "NOT included":
+                        total *= 1 + bond
+                    out[name] = total
+                return out, rejected
+
+            lev, rej = leveled()
+            order = sorted(lev, key=lev.get)
+            self.assertEqual(t.answer["low_bidder"], order[0], t.id)
+            self.assertAlmostEqual(t.answer["low_leveled_amount"], round(lev[order[0]], 2), places=2)
+            self.assertAlmostEqual(t.answer["second_leveled_amount"], round(lev[order[1]], 2), places=2)
+            self.assertEqual(set(t.answer["rejected_bidders"]), set(rej), t.id)
+            self.assertAlmostEqual(t.answer["leveled_spread"],
+                                  round(max(lev.values()) - min(lev.values()), 2), places=2)
+            naive2, _ = leveled(apply2=False)
+            self.assertNotEqual(sorted(naive2, key=naive2.get)[:2], order[:2], t.id)   # rule 2 matters
+            naive3, _ = leveled(apply3=False)
+            self.assertIn(sorted(naive3, key=naive3.get)[0], rej, t.id)                # the rejection matters
+
     def test_wip_from_prompt(self):
         for t in fam("wip_portfolio"):
             over = under = prov = gp = 0.0

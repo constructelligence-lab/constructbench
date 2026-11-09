@@ -33,13 +33,16 @@ class KnowledgeTests(unittest.TestCase):
 
     def test_every_card_is_chosen_by_some_task_and_none_is_huge(self):
         used = set()
+        # the held-out set is kept private and is not in the public repository, so use whatever is present
         for f in ("dev.jsonl", "heldout-text.jsonl"):
+            if not (DATA / f).exists():
+                continue
             for line in (DATA / f).read_text().splitlines():
                 used.update(names(json.loads(line)["prompt"]))
                 self.assertLess(len(reference(json.loads(line)["prompt"])), 2000)
-        # families newer than these files: build them from the registry
+        # families newer than these files: build them from the registry (scheduling covers the expert PDM family)
         from constructbench import registry
-        for t in registry.build(seed=1, per_family=2, domains=["quality", "contracts", "civil", "bim"]):
+        for t in registry.build(seed=1, per_family=2, domains=["quality", "contracts", "civil", "bim", "scheduling"]):
             used.update(names(t.prompt))
         self.assertEqual({c.name for c in CARDS} - used, set())
 

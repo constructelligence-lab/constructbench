@@ -66,6 +66,9 @@ FAMILIES: dict[str, Family] = {
     "drone_survey": robotics.drone_survey,
     "rebar_tying": robotics.rebar_tying,
     "bricklaying": robotics.bricklaying,
+    # autonomous operation: multi-robot allocation and the safety envelope
+    "fleet_allocation": robotics.fleet_allocation,
+    "agv_safety_envelope": robotics.agv_safety_envelope,
     # civil & infrastructure
     "earthwork": built_world.earthwork,
     "gravity_pipe": built_world.gravity_pipe,
@@ -94,11 +97,15 @@ FAMILIES: dict[str, Family] = {
     # expert tier (difficulty "expert"): volume + interacting conventions + real-document traps
     "pdm_calendar": expert.pdm_calendar,
     "pay_app_certification": expert.pay_app_certification,
+    # second level: the same work with traps that interact, for when the first level is at ceiling for every model
+    "pay_app_certification_hard": expert.pay_app_certification_hard,
     "wip_portfolio": expert.wip_portfolio,
     "cost_ledger": expert.cost_ledger,
     "mass_haul": expert.mass_haul,
     "delay_tia": expert.delay_tia,
+    "delay_tia_hard": expert.delay_tia_hard,
     "bid_leveling_expert": expert.bid_leveling_expert,
+    "bid_leveling_expert_hard": expert.bid_leveling_expert_hard,
     # extreme tier: several documents / rule layers interacting at size
     "co_reconciliation": extreme.co_reconciliation,
     "addendum_takeoff": extreme.addendum_takeoff,

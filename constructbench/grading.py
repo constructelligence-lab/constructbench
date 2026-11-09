@@ -15,10 +15,16 @@ from typing import Any
 from .task import FieldSpec, Task
 
 _ANSWER_RE = re.compile(r"ANSWER\s*:\s*(\{.*\})", re.S | re.I)
+_FENCE_RE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.S)
 
 
-def extract_answer(text: str) -> dict[str, Any] | None:
-    """The JSON object after the last `ANSWER:` in the response, or None."""
+def extract_answer(text: str, lenient: bool = False) -> dict[str, Any] | None:
+    """The JSON object after the last `ANSWER:` in the response, or None.
+
+    With `lenient=True` a response that never wrote the `ANSWER:` line is still read: the first fenced JSON object,
+    else the first balanced `{...}`. That exists to REPORT format compliance separately, never to replace the strict
+    score — a benchmark that scores a correct value as zero because of its serialisation is measuring formatting.
+    """
     if not text:
         return None
     # Last occurrence wins: models sometimes restate the format before answering.
@@ -37,6 +43,29 @@ def extract_answer(text: str) -> dict[str, Any] | None:
             continue
         if isinstance(value, dict):
             return value
+    return _lenient_object(text) if lenient else None
+
+
+def _lenient_object(text: str) -> dict[str, Any] | None:
+    """An answer the model printed as JSON without the ANSWER line: a fenced block first, then any balanced object."""
+    for m in _FENCE_RE.finditer(text):
+        try:
+            value = json.loads(m.group(1))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict) and value:
+            return value
+    start = text.find("{")
+    while start != -1:
+        body = _balanced_object(text[start:])
+        if body:
+            try:
+                value = json.loads(body)
+            except json.JSONDecodeError:
+                value = None
+            if isinstance(value, dict) and value:
+                return value
+        start = text.find("{", start + 1)
     return None
 
 
@@ -118,8 +147,8 @@ class Grade:
     fields: dict[str, bool]
 
 
-def grade(task: Task, response_text: str) -> Grade:
-    ans = extract_answer(response_text)
+def grade(task: Task, response_text: str, lenient: bool = False) -> Grade:
+    ans = extract_answer(response_text, lenient=lenient)
     if ans is None:
         return Grade(task.id, task.category, False, False, 0.0, {k: False for k in task.fields})
     lowered = {str(k).strip().lower(): v for k, v in ans.items()}

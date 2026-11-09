@@ -1,0 +1,28 @@
+name: tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Run each test file on its own (the whole suite can need a lot of memory)
+        run: |
+          for f in tests/test_*.py; do
+            echo "== $f"
+            python -m unittest discover -s tests -p "$(basename "$f")" || exit 1
+          done
+      - name: The generated docs are up to date
+        run: |
+          python scripts/make_leaderboard.py
+          python scripts/make_graphics.py
+          git diff --exit-code docs assets

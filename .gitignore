@@ -2,3 +2,8 @@ __pycache__/
 *.pyc
 results/
 out/
+.venv/
+.venv313/
+data/aec-cache/
+data/aec-results/
+.DS_Store

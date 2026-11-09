@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use ConstructBench, please cite it and say which task set and seed you used."
+title: "ConstructBench: an open benchmark of AI models on construction work"
+type: software
+authors:
+  - name: Constructelligence
+    website: https://constructelligence.co
+repository-code: https://github.com/constructelligence-lab/constructbench
+url: https://constructelligence.co
+license: MIT
+keywords: [benchmark, construction, AEC, llm, evaluation, bim, estimating, scheduling]

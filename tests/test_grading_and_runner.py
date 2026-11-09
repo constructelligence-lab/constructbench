@@ -16,6 +16,57 @@ from constructbench.runner import run, regrade, summarize, save_tasks, load_task
 from constructbench.task import FieldSpec, number, INTEGER, TEXT, DATE, SET, LIST
 
 
+class Reporting(unittest.TestCase):
+    """The published numbers must stay separable: completion, format compliance and strict accuracy are three
+    different things, and an API failure is not a wrong answer."""
+
+    def _row(self, ok=True, parsed=True, correct=True, field=1.0):
+        return {"task_id": "t", "rep": 0, "domain": "contracts", "category": "notice_deadlines",
+                "difficulty": "expert", "provider": "fake",
+                "response": {"text": "", "ok": ok, "seconds": 1.0, "output_tokens": 10},
+                "grade": {"task_id": "t", "category": "notice_deadlines", "parsed": parsed, "correct": correct,
+                          "field_score": field, "fields": {}}}
+
+    def test_an_api_failure_is_not_run_never_a_wrong_answer(self):
+        s = summarize([self._row(), self._row(ok=False, parsed=False, correct=False, field=0.0)])
+        self.assertEqual(s["not_run"], 1)
+        self.assertEqual(s["completion"], 0.5)
+        self.assertEqual(s["overall"]["accuracy"], 1.0)          # of the one answer received
+        self.assertEqual(s["attempted"], 2)
+
+    def test_format_compliance_is_reported_separately_from_accuracy(self):
+        s = summarize([self._row(), self._row(parsed=False, correct=False, field=0.0)])
+        self.assertEqual(s["overall"]["format_ok"], 0.5)
+        self.assertEqual(s["overall"]["unparsed"], 1)
+        self.assertEqual(s["overall"]["accuracy"], 0.5)
+
+    def test_partial_credit_keeps_a_near_miss_out_of_the_zero_bin(self):
+        s = summarize([self._row(correct=False, field=0.8)])
+        self.assertAlmostEqual(s["overall"]["field_score"], 0.8)
+        self.assertEqual(s["overall"]["accuracy"], 0.0)
+
+
+class LenientGrading(unittest.TestCase):
+    """A correct value that skipped the ANSWER line must be visible, but only when asked for."""
+
+    def test_strict_needs_the_answer_line_and_lenient_does_not(self):
+        bare = '{"a": 1}'
+        self.assertIsNone(extract_answer(bare))
+        self.assertEqual(extract_answer(bare, lenient=True), {"a": 1})
+
+    def test_lenient_reads_a_fenced_json_block(self):
+        self.assertEqual(extract_answer('here it is:\n```json\n{"a": 1}\n```', lenient=True), {"a": 1})
+        self.assertIsNone(extract_answer('here it is:\n```json\n{"a": 1}\n```'))
+
+    def test_lenient_does_not_invent_an_answer_from_prose(self):
+        self.assertIsNone(extract_answer("The answer is about 1,250 square feet.", lenient=True))
+
+    def test_strict_still_wins_when_the_answer_line_is_present(self):
+        text = 'prose {"wrong": 9}\nANSWER: {"a": 1}'
+        self.assertEqual(extract_answer(text), {"a": 1})
+        self.assertEqual(extract_answer(text, lenient=True), {"a": 1})
+
+
 class Grader(unittest.TestCase):
     def test_numbers(self):
         s = number(0.01)

@@ -307,3 +307,241 @@ The `ci:` agent is a different harness from `+code+submit` and is not part of th
 - Added to the pre-registered plan: rules-chain (24 tasks) joins expert84 + extreme32 → 140 tasks; Haiku arm A
   ≈ $5–6 at the measured per-run cost. Chained-task secondary outcome: share of downstream errors that are carried
   (correct given the model's own upstream value) vs new.
+
+### 2026-10-14 — DeepSeek
+- The same DeepSeek key, re-sent, now authenticates (likely activation delay; first attempt 401). Balance $0.47
+  (topped up, no granted credit). `GET /models` lists `deepseek-flash` (DeepSeek-V4.1-Flash; 1M context, 393k max
+  output, effort low/high/max, default high, text+image input) and `deepseek-v4-pro` (DeepSeek-V4-Pro; same limits,
+  text only). The API returns no prices: **cost is measured as the account-balance difference**
+  (`scripts/deepseek-balance.sh`, 2-decimal resolution; `results/deepseek-balance.log`) and token usage is stored per
+  run (cache hit/miss and reasoning tokens).
+- Settings: OpenAI-compatible `/chat/completions`, temperature 0 (sent; thinking models may ignore it), server-default
+  effort (high), max 32,000 output tokens per reply (`MAX_TOKENS`), same `Toolbox` harness via function calling
+  (schema checked client-side; a malformed submission is returned once).
+- Smoke test (quick set, task arch-far-0000): both models correct in both conditions; harness path ran 1 code call and
+  submitted via tool; reasoning content echoed back between tool turns without error; balance unchanged ($0.47) at
+  2-decimal resolution for 4 runs (≈ 7k tokens).
+- Run plan for the $0.47: DeepSeek Flash on expert84 (both conditions) first; balance read after each chunk; then
+  extreme32 and rules-chain24; then Pro as balance allows. When the balance runs out the API refuses (HTTP 402); those
+  runs are stored as failures and re-run on resume — never scored as wrong.
+
+### 2026-10-14 (later still) — DeepSeek Flash on expert84, both conditions — *times below are machine local (EDT)*
+- **Scope: Flash only.** `deepseek-v4-pro` is explicitly deferred at the user's instruction — no Pro results exist.
+  Set `data/expert84-s20261015.jsonl` (84 expert tasks), settings unchanged from the smoke test: OpenAI-compatible,
+  temperature 0, server-default effort, `MAX_TOKENS=32000`, workers 4.
+- **The 08:47 chunk was interrupted, not refused:** the log stops at `[35/84]` with no summary, no process, and no
+  `402`/`ok:false` rows. **Its cost is unmeasured** — the "after" balance read was never taken, so only the account
+  balance delta of the resume chunks is known. Recorded as a gap, not estimated.
+- **Resume, no harness (09:57, 49 to run, 35 already done — finished tasks are skipped):** balance 4.95 → 4.68 =
+  **$0.27 for 49 runs ≈ $0.0055/run**, ~25 min.
+- **Harness (`+code+submit`) (10:00–10:13, 84 runs):** balance 4.68 → 4.32 = **$0.36 for 84 runs ≈ $0.0043/run**,
+  ~13 min. Session spend $0.63; balance left 4.32.
+- **Results:** no harness **78/84 = 92.9%** (95% CI 85.3–96.7), field 92.9%; harness **82/84 = 97.6%**
+  (91.7–99.3), field 99.0%. Paired by task: **+4.8 pts**, bootstrap 95% CI −1.2 to +11.9, sign-flip p = 0.2891,
+  exact McNemar p = 0.2891; harness better on **6** tasks and worse on **2**. **Not significant** at n = 84. The
+  direction reproduces the 28-task Haiku 5.5 pilot, whose baseline had already broken the ceiling (26/28 = 92.9% →
+  28/28 = 100%), and DeepSeek's baseline lands on the *same* 92.9% over the full 84. The pilot's 28 items are a strict
+  subset of these 84 (checked), so the Haiku pilot runs carry over — but there are no Haiku runs on the other 56 items,
+  so the pooled cross-model comparison on the full set is not available yet.
+- **The two failure modes are different in kind.** No harness: every failure is in `wip_portfolio` (6/12) — **5
+  out-of-tokens** (32,000 output tokens consumed by reasoning, empty reply → unparsed) and **1** stop with prose and no
+  `ANSWER:` line (`x-wip-0003` — also one of Haiku 5.5's two pilot misses, and one the DeepSeek harness then got right,
+  so it is a shared without-a-harness trap rather than a model-specific one). Harness: **zero** format/length failures
+  and all six wip tasks correct, but **2 substantive misses** on `mass_haul` (`x-haul-0000`, `x-haul-0005`, 3/5 fields):
+  the mass-diagram maximum ordinate's value *and* station are wrong while the cut/fill/net totals are right. Net effect
+  of the harness here is to trade a length/format failure mode for a small number of reasoning errors — consistent with
+  (3) of the Claude conclusions, which found the harness's only accuracy *change* was negative.
+- **Efficiency (the clearest effect):** harness cuts mean output tokens **13,960 → 6,069 (−57%)** and mean run time
+  **60.6 s → 33.6 s (−45%)**, reproducing the Claude-family output-token result at a much larger scale. For scale,
+  Haiku 5.5 on the same tier (28-task pilot) ran **5,877 → 2,305** tokens/task, so DeepSeek spends ~2.4× Haiku's
+  baseline on the same items, and the harness cuts both models by a similar ~60%.
+- **Caveats for the write-up.** (1) The 32k ceiling is *our setting*, not a model limit (DeepSeek advertises 393,216
+  max output), so 5 tasks are scored as failures at a cap we chose; a labelled higher-`MAX_TOKENS` rerun would test
+  whether they are really beyond the model. (2) `--effort` is never sent for `api:` providers (the manifest records
+  `effort: null` → server default *high*), so this arm is **not** effort-controlled. (3) DeepSeek publishes no prices
+  and `providers.PRICES` has no DeepSeek entry, so rows carry no `cost_usd`: `report`, `compare` and `--budget` all
+  show "—", DeepSeek cost is only ever the balance delta, and `--budget` must **not** be set for these runs (with no
+  price seen, `runner.affordable()` serialises the run to one worker and never stops).
+- **Artifacts:** `results/expert84-s20261015/{api_deepseek-flash,api_deepseek-flash+code+submit}.jsonl`, logs
+  `results/deepseek-flash-expert84-{resume,harness}.log`, `results/deepseek-balance.log`; `paper/report/` regenerated
+  (new row pair for `expert84-s20261015` and `fig_accuracy_expert84-s20261015.svg`). 130 unit tests pass.
+- **Status vs. the pre-registered plan:** arm F is **half done** — Flash on expert84 complete in both conditions;
+  `extreme32` and `rules-chain24` not run; Pro deferred. Remaining balance 4.32 covers them.
+- **Other models (surveyed, none run):** nothing else is reachable without new credentials — `OPENROUTER_API_KEY`
+  exists in `keys.env` but is commented out (uncommenting unlocks a large OpenAI-compatible catalogue), the other
+  `KEY_ENV` hosts (OpenAI, Together, Groq, Fireworks, Gemini, Mistral) have no keys, and the local arm needs
+  `lms server start` (LM Studio is installed with Qwen2.5-1.5B and Qwen3-4B on disk but its server is **off**;
+  measured ~minutes/task, so the full expert84 set would take ~a day).
+
+### 2026-10-14 (later still) — Haiku 5.5 on expert84, both conditions — the paired effect the study was missing
+- **Why this run:** the expert tier is the only place in the study where the baseline is not at ceiling, so it is the
+  only place a harness effect can be measured. The full 84-task set was run for Haiku 5.5, the cheapest arm.
+- **Budget position first:** total Claude spend before this run was **$4.7099** of the $5.00 study cap (summed from
+  every `anthropic_*.jsonl` `response.extra.cost_usd`), i.e. **$0.29 left**.
+- **How 112 runs fit in $0.29 — the pilot rows carry over.** The 28-task pilot's items are a verified *subset* of these
+  84 and the pilot ran under identical settings (Haiku 5.5, effort high, 16,000 max tokens, adaptive thinking,
+  `--task-budget 0.05`, the same harness words). So the 28 pilot rows per condition were **copied into the 84-set
+  result files** instead of re-run, leaving 56+56. Stated explicitly because those two files now hold rows from two
+  invocations — the run manifests beside them carry only this run's command and task-set hash.
+- **Commands** (direct CLI rather than `bench.sh`: `bench.sh`'s `BUDGET` counts every Claude file in the output folder,
+  so after the base leg the harness leg would have been blocked before its first task):
+  base `--provider anthropic:claude-haiku-5-5 --budget 0.30 --task-budget 0.05`, harness the same with
+  `+code+submit` and `--budget 0.156` (sized to the remaining study allowance).
+- **Results:** no harness **77/84 = 91.7%** (95% CI 83.8–95.9), field 95.1%, $0.2748*, 6,142 tok, 22.3 s; harness
+  **82/82 = 100%** (95.5–100), field 100%, $0.1548, 2,280 tok, 12.0 s. *(*includes the carried-over rows.)*
+- **Paired on the 82 tasks answered by both: 92.7% → 100.0%, +7.3 pts (bootstrap 95% CI +2.4 to +13.4), sign-flip
+  p = 0.03125, exact McNemar p = 0.03125 — the study's first *significant* harness effect, and in the harness's
+  favour, with 6 tasks better and none worse.** (The pilot's own 26/28 → 28/28 was a 2-discordant-pair result,
+  p = 0.5.)
+- **The budget stop is honest, not hidden:** the harness leg reached the $5 cap after $0.15; `x-level-0010` and
+  `x-level-0011` are **not run** and are reported as not run, per the pre-registered rule. The harness figure is
+  therefore on 82 tasks, and the paired analysis uses the 82 common ones. Re-running either file resumes it.
+- **Failure profiles differ by model, and the harness removes them all.** Haiku baseline: **4 numeric errors (>1%) +
+  3 out-of-tokens**. DeepSeek baseline: **0 numeric errors**, 5 out-of-tokens + 1 unparseable. So DeepSeek computes
+  more reliably but spends ~2.3× the tokens and runs into the ceiling; Haiku computes a little worse but finishes.
+  The harness removes **all 7** of Haiku's failures and all 6 of DeepSeek's — but adds **2** fresh numeric errors for
+  DeepSeek. Only Haiku's harness effect is clean and significant.
+- **Head-to-head on the same tasks:** no harness 91.7% (Haiku) vs 92.9% (DeepSeek) — a tie inside the noise;
+  with the harness **100.0% (Haiku) vs 97.6% (DeepSeek)**. The cheaper model is the one that ends up perfect.
+- **Efficiency — and this is the opposite of the Claude finding on quick/fresh:** the harness cuts Haiku's output
+  tokens **6,142 → 2,280 (−63%)** and time **22.3 → 12.0 s**, so **cost per correct answer falls, $0.0036 → $0.0019**.
+  On quick/fresh the harness raised cost 12–31%; on the expert tier it halves it. (There, the tasks were short enough
+  that tool descriptions dominated the bill; here the baseline's own reasoning dominates.)
+- **Spend after: true study spend ≈ $4.9986 of $5.00 — the cap is reached.** ⚠️ **A naive sum over every
+  `anthropic_*.jsonl` now reads $5.1395 and must not be read as overspend:** the 28 carried-over rows are counted once
+  in the pilot files (`results/expert-s20261015/`) and again in the 84-set files. Reconcile by subtracting the
+  duplicate pair — $0.0878 + $0.0531 = **$0.1409** — which is exactly the work the carry-over avoided paying for twice.
+  Further Claude arms (Sonnet, Opus, repeats, the effort sweep) need a new budget decision before they can run.
+- 130 unit tests pass; `paper/report/` regenerated (Haiku expert84 rows with cost, and the new paired row).
+
+### 2026-10-15 — Reporting policy: completion, format compliance and strict accuracy are now published separately
+Found while running the OpenRouter arms, where two ways a single accuracy number misleads both showed up in one session.
+- **An API failure was being counted as a wrong answer.** When the OpenRouter balance ran out mid-run, 208 rows were
+  stored with `ok=false` (HTTP 402). `summarize()` divided by *every* row, so ling's harness read 35/84 = 41.7% when the
+  truth on the answers actually received was 35/36 = 97.2%, and gpt-oss-120b read a meaningless 0.0%. Fixed: a call that
+  produced no answer at all is **`not_run`** — excluded from accuracy and reported as its own number, which is what the
+  pre-registration always said. A refusal still counts (a refusal *is* an answer). `stats.paired()` drops the same rows
+  per side, so a paired test can no longer be poisoned by one side's credit failure.
+- **Format compliance was invisible.** gpt-oss-120b wrote the *correct* values for `x-pdm-0000` as bare JSON with no
+  `ANSWER:` line and scored **0**. A benchmark that scores serialisation as competence is measuring formatting.
+  `score --lenient` now reports, *beside* the strict score and never instead, what the score would be if the `ANSWER:`
+  line were not required (fenced JSON, else the first balanced object). It recovers exactly that task: `+1 recovered`.
+  Supporting number: ling's baseline **format compliance is 52.4%** — its 40.5% baseline was mostly *failing to answer
+  at all*, not answering wrongly, which the old single number hid completely.
+- **Published per run now:** strict accuracy (of answers received) · partial credit (mean field score) · completion
+  (answered/attempted) · format compliance (parsed/answered). The leaderboard carries all four as columns; the domain
+  columns stay strict accuracy. Cost per correct answer stays as before.
+- **New `calibrate` subcommand** — per-item pass rate across every run given, flagging items every run passes or fails.
+  On expert84 over 8 result files: **informativeness (mean p(1−p)) = 0.111** against 0.25 ideal, with **29 of 84 items
+  passed by every run** (35%) and none failed by all. Those 29 carry no information for a frontier comparison and are
+  the first candidates to retire or re-seed before this set is published as a standard. This is the measurement that
+  had been missing: the set is too easy at the top, which is why a +4.8 pt effect could not reach significance.
+- **No published number moved.** Re-scored after the change: haiku base 91.7%, haiku harness 100.0%, deepseek base
+  92.9%, deepseek harness 97.6% — identical, because no earlier run had API failures to exclude. `paper/report/`
+  regenerates unchanged.
+- Also in this pass, aimed at international coverage (the benchmark is US-customary throughout): toolkit gains
+  `convert()` / `convert_temp()` / `unit_dimension()` — metric↔US across length, area, volume, mass, force, stress,
+  flow, velocity, power and energy, tolerant of how the unit is written (`'sq ft'`, `'sf'`, `'ft²'`, `'CY'`, `'cu yd'`,
+  `'m/s'`), refusing cross-dimension conversions and routing temperature to the right helper. The quantity-units card
+  now carries the metric equivalents (1 m³ = 1.30795 yd³, 1 MPa = 145.038 psi, …) and the rule to convert everything
+  to one system *before* the arithmetic. 156 unit tests pass (was 144).
+
+### 2026-10-15 (later) — `calibrate` found the ceiling; the first harder family is in
+- **Where the dead weight is.** `calibrate` over expert84 and 8 result files: informativeness (mean p(1−p)) **0.111**
+  against 0.25 ideal, **29 of 84 items passed by every run**. By family: `pay_app_certification` **11/12**,
+  `delay_tia` **9/12**, `bid_leveling_expert` **8/12**, `mass_haul` 1/12, and `pdm_calendar` / `wip_portfolio` /
+  `cost_ledger` 0. Those three families carry 28 of the 29 dead items; the other four already discriminate.
+- **Cause, not just the count.** The three easy families state every rule explicitly and need one well-formed loop
+  (find the arithmetic errors, drop the pending lines, apply the retainage step). Nothing *interacts*, so a model with
+  a calculator cannot fail. Difficulty in this benchmark must come from interacting conventions, not volume.
+- **Fix, started: a second level per family.** Registered as its own family so the frozen first level is untouched
+  (`pay_app_certification_hard`, `registry.FAMILIES`). Three rules that interact: (3) stored materials whose Stored OK
+  is N are excluded from *every* total while the printed G still contains them — so the arithmetic-error rule never
+  flags them; (2+6) pending change orders whose billings are already inside the previous-certificates figure, so the
+  exclusion rule only completes with the adjustment rule; (4) an approved deductive change order with a **negative**
+  scheduled value that must be carried with its sign into the contract sum and therefore into the percent complete and
+  the 50% retainage knife-edge. **Seven answer fields instead of five**, so missing one rule costs fields rather than
+  the item — which the new partial-credit column now reports.
+- **Verified three ways.** Oracle 100% across seeds (the suite's per-family sweep); the independent re-derivation test
+  in `tests/test_expert.py` extended so all seven fields are recomputed from the prompt text by code written separately
+  from the generator (this is the "second implementation" a standard needs, not a restatement of the generator);
+  determinism and keys-in-prompt unchanged. **157 tests pass.** Mean prompt 5.2k chars vs 3.7k.
+- **Measured effect on discriminating power.** ling-3.0-flash, base condition: first level **11/12 = 91.7%** (all-pass)
+  → second level **4/12 = 33.3%** (95% CI 13.8–60.9; partial credit 59.5%; format compliance 75.0%). **A 58-point fall
+  on the cheapest model in the study**, on items that previously separated nobody. The partial-credit figure is the
+  tell that the design works: models are getting *some* fields (59.5%) while failing the item — the traps are
+  interacting, not just harder to read.
+- Set used for the check: `data/hard-smoke-s20261021.jsonl` (12 items, seed 20261021); both conditions cost ~$0.02.
+- **Next:** the same second level for `delay_tia` (9/12 all-pass) and `bid_leveling_expert` (8/12), then a v2 tier =
+  second levels for those three + the four families that already discriminate, re-calibrated *before* publication so
+  the informativeness figure of the published set is a measured number rather than a hope.
+
+### 2026-10-15 (later still) — the other two ceiling families get a second level
+- **`delay_tia_hard`** — four interacting rules on top of the plain one: a **per-month weather allowance** (a
+  weather-only day is excusable only after that month's anticipated days are used up, so the day table can no longer
+  be read in one pass), **two notice periods** (Owner 21 calendar days, Weather 10 — applying one period to both is
+  the trap), and **two caps** (liquidated damages capped at a percentage of the contract sum, extended general
+  conditions capped separately). The extension therefore moves the LD start date, which decides whether the cap
+  binds. Fields 5 → 7 (`weather_days_not_excusable` joins the set so the allowance itself is scorable).
+- **`bid_leveling_expert_hard`** — two mechanisms that each change the winner: a **non-responsive bid** (excludes a
+  mandatory item and carries no allowance for it → rejected outright, never levelled) and a **correction that only
+  applies when the form says so** (words govern over figures, but on a form marked "unit prices govern" whose line
+  items total differs, the line-item total governs). Both the opposite mistakes are present in every item: a decoy
+  form says "unit prices govern" while agreeing with its words, and a second bidder excludes a mandatory item *with*
+  an allowance, which is responsive. Fields 3 → 5 (rejected bidders and the leveled spread join the top two).
+- **Two bugs of my own, both caught by tests, both worth recording.**
+  1. The first attempt *hunted* for the traps with conjunctive `Retry` guards. `test_generators`'s per-family sweep
+     caught it at once: `bid_leveling_expert_hard: no unambiguous draw in 200 tries`. Sampling for a conjunction of
+     three unlikely events is not a design.
+  2. The independent re-derivation test then caught a genuine **design** flaw: the rejected bid was chosen from the
+     naive ranking, but a model that ignores the rejection rule levels that bid *with the exclusion's plug added
+     back in*, which can lift it out of first place — so the trap sometimes did not bite at all. The test asserted the
+     trap must change the winner and failed, which is exactly what an independent reading of the prompt is for.
+  Both are fixed by **constructing** the traps from the ranking a rule-ignoring model actually sees
+  (`excluded_total()` tries the exclusion on each bidder and keeps the one that then levels lowest). Generation went
+  from failing to instant (0.00 s for 10 items) and every item now provably carries both traps — asserted, not hoped.
+- **159 tests pass** (was 157). Three second-level families exist — `pay_app_certification_hard`, `delay_tia_hard`,
+  `bid_leveling_expert_hard` — and all three are re-derived field by field from their own prompt text by code written
+  separately from the generator (`tests/test_expert.py`), which is the second implementation a benchmark needs before
+  anyone else is asked to trust it.
+
+### 2026-10-15 (later still) — autonomous robotics, and one escalation that failed
+- **New domain coverage: autonomous operation** (the robotics domain had navigation, layout, kinematics, survey and
+  productivity, but nothing that turns on *autonomy*). Two families, both `expert`:
+  - **`fleet_allocation`** — dispatch 4 tasks across a 5-robot fleet minimising total distance, with a per-robot
+    remaining range. The range trap is **constructed**, not sampled: the plan that ignores the range limit is found
+    first and the range of the robot it leans on furthest is capped, so that plan is provably infeasible and rule 2
+    must change the answer. The nearest-robot-first (greedy) dispatcher is also wrong on 6 of 10 items; that trap is
+    recorded in `meta.greedy_trap` rather than required, because it cannot be constructed reliably. Fields:
+    assignment, total distance, makespan, idle robots.
+  - **`agv_safety_envelope`** — ISO 13855-style protective stop distance for an autonomous site vehicle
+    (`S = K·T + v²/2a + C`), then the highest approach speed that still fits the scanner's zone. The deceleration is
+    reduced by the stated payload, C is in millimetres against metres elsewhere, and rule 4 must be *solved* rather
+    than scaled — and it depends on the answer to rule 2. Fields: stopping distance, payload-reduced deceleration,
+    permitted, max permitted speed.
+  Both are re-derived independently in `tests/test_robotics.py`. **161 tests pass** (was 159).
+- **A design flaw I introduced and then measured: `bid_leveling_expert_hard` is not harder.** ling-3.0-flash, base:
+
+  | family | first level | second level | Δ |
+  |---|---|---|---|
+  | `pay_app_certification` | 11/12 = 91.7% | **3/12 = 25.0%** | **−66.7** |
+  | `delay_tia` | 10/12 = 83.3% | **5/12 = 41.7%** | **−41.7** |
+  | `bid_leveling_expert` | 9/12 = 75.0% | 12/12 = 100.0% | **+25.0** |
+
+  Two of the three second levels work exactly as intended (aggregate over the 36 items: 30/36 = 83.3% first level →
+  the second level cuts it by roughly half, with partial credit well above strict accuracy, which is the signature of
+  traps that cost fields rather than whole items). **The third is a genuine failure of my design**: adding the
+  rejection rule and the unit-price correction made the item *more* structured, not harder — the rules are explicit
+  and the traps are mechanical once read, whereas the first level's words-versus-figures trap is a reading trap that
+  ling actually fails. n = 12 on one model, so treat the +25 as no better than flat, but there is no evidence the
+  second level helps and one clear reason to think it hurts.
+  **Action:** do not ship `bid_leveling_expert_hard` in a v2 tier until it is redesigned — the lever for that family is
+  the *form* (handwriting-style ambiguity, an illegible figure, a bid needing a written clarification), not more rules.
+  This is recorded rather than quietly dropped, because "we raised difficulty" is exactly the claim a benchmark
+  maintainer must be able to prove per family, and `calibrate` is the tool that proves or refutes it.
+
+### 2026-10-28 — first full manuscript draft
+- Wrote `paper/PAPER.md` (abstract, benchmark, harness, design, results, methodological findings, threats, remaining work).
+  Every number is copied from this notebook, `paper/report/report.md` and `results/hard3-s20261021/LEADERBOARD.md`; no new
+  runs, no spend. Unmeasured items are marked **[TODO]** in the draft; the same list is its section 8.
+- Not re-checked in this pass: the decontam figures (0/288, 5/5) come from project notes, not a fresh run.

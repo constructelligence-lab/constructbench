@@ -102,20 +102,32 @@ def run(provider: Provider, tasks: list[Task], out: Path, workers: int = 4, log=
     return out
 
 
-def regrade(results: Path, tasks: list[Task]) -> list[dict]:
-    """Grade stored responses again with the current grader and task set."""
+def result_files(directory) -> list[Path]:
+    """The result files in a directory: `*.jsonl`, never a `.manifest.jsonl` sidecar and never a dotfile. Python's
+    glob matches a leading dot where the shell does not, so a leftover `.limit.jsonl` (tasks, not results) must be
+    excluded explicitly."""
+    return sorted(p for p in Path(directory).glob("*.jsonl")
+                  if not p.name.startswith(".") and not p.name.endswith("manifest.jsonl"))
+
+
+def regrade(results: Path, tasks: list[Task], lenient: bool = False) -> list[dict]:
+    """Grade stored responses again with the current grader and task set. `lenient` also reads an answer a model
+    printed as JSON without the ANSWER line — for reporting format compliance, not for the official score.
+    A line that is not a result row (a manifest, a tasks file) is ignored rather than crashing the regrade."""
     by_id = {t.id: t for t in tasks}
     latest: dict[tuple, dict] = {}
     for l in results.read_text().splitlines():
         if l.strip():
             row = json.loads(l)
+            if "task_id" not in row or not isinstance(row.get("response"), dict):
+                continue                      # a manifest line or another file's content, not a response
             latest[(row["task_id"], row.get("rep", 0))] = row   # a re-run of a failed call supersedes it
     rows = []
     for row in latest.values():
         t = by_id.get(row["task_id"])
         if t is None:
             continue
-        row["grade"] = asdict(grade(t, row["response"]["text"]))
+        row["grade"] = asdict(grade(t, row["response"]["text"], lenient=lenient))
         row["difficulty"] = t.difficulty          # older result files predate this field
         rows.append(row)
     return rows
@@ -133,6 +145,18 @@ def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
 
 
 def summarize(rows: list[dict]) -> dict:
+    """Aggregate rows into the three numbers a careful reader needs, separately:
+
+    * **completion** — how much of the run produced any answer at all. Calls that failed at the API (rate limit,
+      outage, exhausted balance) and tasks stopped by a budget are `not_run`, never scored as wrong.
+    * **format compliance** (`format_ok`) — of the answers received, how many wrote the answer contract at all. A
+      correct value that skipped the contract must be visible here rather than silently counted as wrong.
+    * **strict accuracy** — of the answers received, how many were fully correct. `field_score` carries the
+      partial credit, so a five-field answer with one wrong field is not dumped in with a blank one.
+    """
+    total = len(rows)
+    rows = [r for r in rows if (r.get("response") or {}).get("ok", True)]
+
     def agg(sel):
         n = len(sel)
         k = sum(1 for r in sel if r["grade"]["correct"])
@@ -141,11 +165,13 @@ def summarize(rows: list[dict]) -> dict:
         secs = [r["response"].get("seconds") or 0 for r in sel]
         toks = [r["response"].get("output_tokens") for r in sel if r["response"].get("output_tokens")]
         return {"n": n, "correct": k, "accuracy": k / n if n else 0.0, "ci95": [lo, hi], "field_score": partial,
+                "format_ok": (n - sum(1 for r in sel if not r["grade"]["parsed"])) / n if n else 0.0,
                 "unparsed": sum(1 for r in sel if not r["grade"]["parsed"]),
                 "errors": sum(1 for r in sel if not r["response"]["ok"]),
                 "mean_seconds": sum(secs) / n if n else 0.0,
                 "mean_output_tokens": sum(toks) / len(toks) if toks else None}
-    out = {"overall": agg(rows), "domains": {}, "categories": {}}
+    out = {"overall": agg(rows), "domains": {}, "categories": {}, "attempted": total,
+           "not_run": total - len(rows), "completion": len(rows) / total if total else 0.0}
     for d in DOMAINS:
         sel = [r for r in rows if r["domain"] == d]
         if sel:

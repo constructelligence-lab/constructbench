@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 876 376" width="876" height="376" role="img" font-family="Inter, Helvetica, Arial, sans-serif" font-size="12">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1956 376" width="1956" height="376" role="img" font-family="Inter, Helvetica, Arial, sans-serif" font-size="12">
 <title>Accuracy vs task size</title>
 <desc>Small multiples per model: accuracy by prompt-length bin.</desc>
-<rect width="876" height="376" fill="#fcfcfb"/>
+<rect width="1956" height="376" fill="#fcfcfb"/>
 <text x="56.0" y="22.0" font-size="15" fill="#0b0b0b" text-anchor="start" font-weight="600">Accuracy vs task size</text>
 <text x="56.0" y="40.0" font-size="12" fill="#8a8984" text-anchor="start" font-weight="normal">Prompt length in characters, pooled over task sets · points with fewer than 3 runs omitted</text>
 <line x1="56" x2="286" y1="296.0" y2="296.0" stroke="#e6e5e0"/>
@@ -16,15 +16,15 @@
 <text x="221.5" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">8–16k</text>
 <text x="272.0" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">≥16k</text>
 <text x="171.0" y="66.0" font-size="12" fill="#0b0b0b" text-anchor="middle" font-weight="600">claude-haiku-5-5</text>
-<path d="M70.0,96.0 L120.5,105.1 L221.5,146.0" fill="none" stroke="#eb6834" stroke-width="2"/>
-<circle cx="70.0" cy="96.0" r="4.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>claude-haiku-5-5 · No harness · &lt;2k chars: 100.0% of 96 runs</title></circle>
-<circle cx="120.5" cy="105.1" r="4.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>claude-haiku-5-5 · No harness · 2–4k chars: 95.5% of 22 runs</title></circle>
-<circle cx="221.5" cy="146.0" r="4.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>claude-haiku-5-5 · No harness · 8–16k chars: 75.0% of 4 runs</title></circle>
-<text x="221.5" y="164.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">No harness</text>
-<path d="M70.0,100.2 L120.5,96.0 L221.5,96.0" fill="none" stroke="#2a78d6" stroke-width="2"/>
-<circle cx="70.0" cy="100.2" r="4.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>claude-haiku-5-5 · Harness (code + submit) · &lt;2k chars: 97.9% of 96 runs</title></circle>
-<circle cx="120.5" cy="96.0" r="4.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>claude-haiku-5-5 · Harness (code + submit) · 2–4k chars: 100.0% of 22 runs</title></circle>
-<circle cx="221.5" cy="96.0" r="4.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>claude-haiku-5-5 · Harness (code + submit) · 8–16k chars: 100.0% of 4 runs</title></circle>
+<path d="M70.0,96.0 L120.5,110.6 L221.5,133.5" fill="none" stroke="#eb6834" stroke-width="2"/>
+<circle cx="70.0" cy="96.0" r="4.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>claude-haiku-5-5 · No harness · &lt;2k chars: 100.0% of 108 runs</title></circle>
+<circle cx="120.5" cy="110.6" r="4.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>claude-haiku-5-5 · No harness · 2–4k chars: 92.7% of 82 runs</title></circle>
+<circle cx="221.5" cy="133.5" r="4.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>claude-haiku-5-5 · No harness · 8–16k chars: 81.2% of 16 runs</title></circle>
+<text x="221.5" y="151.5" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">No harness</text>
+<path d="M70.0,99.7 L120.5,96.0 L221.5,96.0" fill="none" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="70.0" cy="99.7" r="4.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>claude-haiku-5-5 · Harness (code + submit) · &lt;2k chars: 98.1% of 108 runs</title></circle>
+<circle cx="120.5" cy="96.0" r="4.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>claude-haiku-5-5 · Harness (code + submit) · 2–4k chars: 100.0% of 80 runs</title></circle>
+<circle cx="221.5" cy="96.0" r="4.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>claude-haiku-5-5 · Harness (code + submit) · 8–16k chars: 100.0% of 16 runs</title></circle>
 <text x="221.5" y="86.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">Harness</text>
 <line x1="326" x2="556" y1="296.0" y2="296.0" stroke="#e6e5e0"/>
 <line x1="326" x2="556" y1="196.0" y2="196.0" stroke="#e6e5e0"/>
@@ -52,6 +52,72 @@
 <text x="610.0" y="114.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">No harness</text>
 <circle cx="610.0" cy="96.0" r="4.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>claude-sonnet-5-5 · Harness (code + submit) · &lt;2k chars: 100.0% of 91 runs</title></circle>
 <text x="610.0" y="86.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">Harness</text>
+<line x1="866" x2="1096" y1="296.0" y2="296.0" stroke="#e6e5e0"/>
+<line x1="866" x2="1096" y1="196.0" y2="196.0" stroke="#e6e5e0"/>
+<line x1="866" x2="1096" y1="96.0" y2="96.0" stroke="#e6e5e0"/>
+<text x="880.0" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">&lt;2k</text>
+<text x="930.5" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">2–4k</text>
+<text x="981.0" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">4–8k</text>
+<text x="1031.5" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">8–16k</text>
+<text x="1082.0" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">≥16k</text>
+<text x="981.0" y="66.0" font-size="12" fill="#0b0b0b" text-anchor="middle" font-weight="600">deepseek-flash</text>
+<path d="M880.0,96.0 L930.5,116.0 L1031.5,96.0" fill="none" stroke="#eb6834" stroke-width="2"/>
+<circle cx="880.0" cy="96.0" r="4.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>deepseek-flash · No harness · &lt;2k chars: 100.0% of 13 runs</title></circle>
+<circle cx="930.5" cy="116.0" r="4.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>deepseek-flash · No harness · 2–4k chars: 90.0% of 60 runs</title></circle>
+<circle cx="1031.5" cy="96.0" r="4.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>deepseek-flash · No harness · 8–16k chars: 100.0% of 12 runs</title></circle>
+<text x="1031.5" y="114.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">No harness</text>
+<path d="M880.0,126.8 L930.5,96.0 L1031.5,96.0" fill="none" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="880.0" cy="126.8" r="4.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>deepseek-flash · Harness (code + submit) · &lt;2k chars: 84.6% of 13 runs</title></circle>
+<circle cx="930.5" cy="96.0" r="4.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>deepseek-flash · Harness (code + submit) · 2–4k chars: 100.0% of 60 runs</title></circle>
+<circle cx="1031.5" cy="96.0" r="4.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>deepseek-flash · Harness (code + submit) · 8–16k chars: 100.0% of 12 runs</title></circle>
+<text x="1031.5" y="86.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">Harness</text>
+<line x1="1136" x2="1366" y1="296.0" y2="296.0" stroke="#e6e5e0"/>
+<line x1="1136" x2="1366" y1="196.0" y2="196.0" stroke="#e6e5e0"/>
+<line x1="1136" x2="1366" y1="96.0" y2="96.0" stroke="#e6e5e0"/>
+<text x="1150.0" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">&lt;2k</text>
+<text x="1200.5" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">2–4k</text>
+<text x="1251.0" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">4–8k</text>
+<text x="1301.5" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">8–16k</text>
+<text x="1352.0" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">≥16k</text>
+<text x="1251.0" y="66.0" font-size="12" fill="#0b0b0b" text-anchor="middle" font-weight="600">deepseek-v4-pro</text>
+<line x1="1406" x2="1636" y1="296.0" y2="296.0" stroke="#e6e5e0"/>
+<line x1="1406" x2="1636" y1="196.0" y2="196.0" stroke="#e6e5e0"/>
+<line x1="1406" x2="1636" y1="96.0" y2="96.0" stroke="#e6e5e0"/>
+<text x="1420.0" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">&lt;2k</text>
+<text x="1470.5" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">2–4k</text>
+<text x="1521.0" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">4–8k</text>
+<text x="1571.5" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">8–16k</text>
+<text x="1622.0" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">≥16k</text>
+<text x="1521.0" y="66.0" font-size="12" fill="#0b0b0b" text-anchor="middle" font-weight="600">inclusionai/ling-3.0-flash</text>
+<path d="M1420.0,279.3 L1470.5,189.3 L1571.5,279.3" fill="none" stroke="#eb6834" stroke-width="2"/>
+<circle cx="1420.0" cy="279.3" r="4.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>inclusionai/ling-3.0-flash · No harness · &lt;2k chars: 8.3% of 12 runs</title></circle>
+<circle cx="1470.5" cy="189.3" r="4.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>inclusionai/ling-3.0-flash · No harness · 2–4k chars: 53.3% of 60 runs</title></circle>
+<circle cx="1571.5" cy="279.3" r="4.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>inclusionai/ling-3.0-flash · No harness · 8–16k chars: 8.3% of 12 runs</title></circle>
+<text x="1571.5" y="297.3" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">No harness</text>
+<path d="M1420.0,96.0 L1470.5,106.0 L1571.5,96.0" fill="none" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="1420.0" cy="96.0" r="4.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>inclusionai/ling-3.0-flash · Harness (code + submit) · &lt;2k chars: 100.0% of 12 runs</title></circle>
+<circle cx="1470.5" cy="106.0" r="4.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>inclusionai/ling-3.0-flash · Harness (code + submit) · 2–4k chars: 95.0% of 60 runs</title></circle>
+<circle cx="1571.5" cy="96.0" r="4.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>inclusionai/ling-3.0-flash · Harness (code + submit) · 8–16k chars: 100.0% of 12 runs</title></circle>
+<text x="1571.5" y="86.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">Harness</text>
+<line x1="1676" x2="1906" y1="296.0" y2="296.0" stroke="#e6e5e0"/>
+<line x1="1676" x2="1906" y1="196.0" y2="196.0" stroke="#e6e5e0"/>
+<line x1="1676" x2="1906" y1="96.0" y2="96.0" stroke="#e6e5e0"/>
+<text x="1690.0" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">&lt;2k</text>
+<text x="1740.5" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">2–4k</text>
+<text x="1791.0" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">4–8k</text>
+<text x="1841.5" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">8–16k</text>
+<text x="1892.0" y="312.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">≥16k</text>
+<text x="1791.0" y="66.0" font-size="12" fill="#0b0b0b" text-anchor="middle" font-weight="600">openai/gpt-oss-120b</text>
+<path d="M1690.0,296.0 L1740.5,296.0 L1841.5,296.0" fill="none" stroke="#eb6834" stroke-width="2"/>
+<circle cx="1690.0" cy="296.0" r="4.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>openai/gpt-oss-120b · No harness · &lt;2k chars: 0.0% of 12 runs</title></circle>
+<circle cx="1740.5" cy="296.0" r="4.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>openai/gpt-oss-120b · No harness · 2–4k chars: 0.0% of 60 runs</title></circle>
+<circle cx="1841.5" cy="296.0" r="4.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>openai/gpt-oss-120b · No harness · 8–16k chars: 0.0% of 12 runs</title></circle>
+<text x="1841.5" y="314.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">No harness</text>
+<path d="M1690.0,296.0 L1740.5,296.0 L1841.5,296.0" fill="none" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="1690.0" cy="296.0" r="4.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>openai/gpt-oss-120b · Harness (code + submit) · &lt;2k chars: 0.0% of 12 runs</title></circle>
+<circle cx="1740.5" cy="296.0" r="4.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>openai/gpt-oss-120b · Harness (code + submit) · 2–4k chars: 0.0% of 60 runs</title></circle>
+<circle cx="1841.5" cy="296.0" r="4.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>openai/gpt-oss-120b · Harness (code + submit) · 8–16k chars: 0.0% of 12 runs</title></circle>
+<text x="1841.5" y="286.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">Harness</text>
 <rect x="56" y="353" width="10" height="10" rx="2" fill="#eb6834"/>
 <text x="70.0" y="362.0" font-size="12" fill="#52514e" text-anchor="start" font-weight="normal">No harness</text>
 <rect x="146.0" y="353" width="10" height="10" rx="2" fill="#2a78d6"/>

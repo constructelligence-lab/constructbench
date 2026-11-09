@@ -1,53 +1,75 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 590 380" width="590" height="380" role="img" font-family="Inter, Helvetica, Arial, sans-serif" font-size="12">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 890 380" width="890" height="380" role="img" font-family="Inter, Helvetica, Arial, sans-serif" font-size="12">
 <title>Accuracy on quick-families</title>
 <desc>Grouped bars: accuracy per model and condition with 95% CIs.</desc>
-<rect width="590" height="380" fill="#fcfcfb"/>
+<rect width="890" height="380" fill="#fcfcfb"/>
 <text x="56.0" y="22.0" font-size="15" fill="#0b0b0b" text-anchor="start" font-weight="600">Accuracy on quick-families, by model and condition</text>
 <text x="56.0" y="40.0" font-size="12" fill="#8a8984" text-anchor="start" font-weight="normal">Share of tasks fully correct · bars show 95% Wilson intervals</text>
-<line x1="56" x2="574" y1="310.0" y2="310.0" stroke="#e6e5e0" stroke-width="1"/>
+<line x1="56" x2="874" y1="310.0" y2="310.0" stroke="#e6e5e0" stroke-width="1"/>
 <text x="48.0" y="314.0" font-size="11" fill="#8a8984" text-anchor="end" font-weight="normal">0%</text>
-<line x1="56" x2="574" y1="246.5" y2="246.5" stroke="#e6e5e0" stroke-width="1"/>
+<line x1="56" x2="874" y1="246.5" y2="246.5" stroke="#e6e5e0" stroke-width="1"/>
 <text x="48.0" y="250.5" font-size="11" fill="#8a8984" text-anchor="end" font-weight="normal">25%</text>
-<line x1="56" x2="574" y1="183.0" y2="183.0" stroke="#e6e5e0" stroke-width="1"/>
+<line x1="56" x2="874" y1="183.0" y2="183.0" stroke="#e6e5e0" stroke-width="1"/>
 <text x="48.0" y="187.0" font-size="11" fill="#8a8984" text-anchor="end" font-weight="normal">50%</text>
-<line x1="56" x2="574" y1="119.5" y2="119.5" stroke="#e6e5e0" stroke-width="1"/>
+<line x1="56" x2="874" y1="119.5" y2="119.5" stroke="#e6e5e0" stroke-width="1"/>
 <text x="48.0" y="123.5" font-size="11" fill="#8a8984" text-anchor="end" font-weight="normal">75%</text>
-<line x1="56" x2="574" y1="56.0" y2="56.0" stroke="#e6e5e0" stroke-width="1"/>
+<line x1="56" x2="874" y1="56.0" y2="56.0" stroke="#e6e5e0" stroke-width="1"/>
 <text x="48.0" y="60.0" font-size="11" fill="#8a8984" text-anchor="end" font-weight="normal">100%</text>
-<path d="M106.3,310.0 V60.0 Q106.3,56.0 110.3,56.0 H136.3 Q140.3,56.0 140.3,60.0 V310.0 Z" fill="#eb6834"><title>claude-haiku-5-5 · No harness: 100.0% (41/41), 95% CI 91.4%–100.0%</title></path>
-<line x1="123.3" x2="123.3" y1="77.8" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
-<line x1="119.3" x2="127.3" y1="77.8" y2="77.8" stroke="#0b0b0b" stroke-width="1.5"/>
-<line x1="119.3" x2="127.3" y1="56.0" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
-<text x="123.3" y="51.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">100</text>
-<path d="M142.3,310.0 V66.2 Q142.3,62.2 146.3,62.2 H172.3 Q176.3,62.2 176.3,66.2 V310.0 Z" fill="#2a78d6"><title>claude-haiku-5-5 · Harness (code + submit): 97.6% (40/41), 95% CI 87.4%–99.6%</title></path>
-<line x1="159.3" x2="159.3" y1="88.0" y2="57.1" stroke="#0b0b0b" stroke-width="1.5"/>
-<line x1="155.3" x2="163.3" y1="88.0" y2="88.0" stroke="#0b0b0b" stroke-width="1.5"/>
-<line x1="155.3" x2="163.3" y1="57.1" y2="57.1" stroke="#0b0b0b" stroke-width="1.5"/>
-<text x="159.3" y="52.1" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">98</text>
-<text x="142.3" y="328.0" font-size="12" fill="#0b0b0b" text-anchor="middle" font-weight="normal">claude-haiku-5-5</text>
-<path d="M279.0,310.0 V60.0 Q279.0,56.0 283.0,56.0 H309.0 Q313.0,56.0 313.0,60.0 V310.0 Z" fill="#eb6834"><title>claude-opus-5-5 · No harness: 100.0% (41/41), 95% CI 91.4%–100.0%</title></path>
-<line x1="296.0" x2="296.0" y1="77.8" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
-<line x1="292.0" x2="300.0" y1="77.8" y2="77.8" stroke="#0b0b0b" stroke-width="1.5"/>
-<line x1="292.0" x2="300.0" y1="56.0" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
-<text x="296.0" y="51.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">100</text>
-<path d="M315.0,310.0 V60.0 Q315.0,56.0 319.0,56.0 H345.0 Q349.0,56.0 349.0,60.0 V310.0 Z" fill="#2a78d6"><title>claude-opus-5-5 · Harness (code + submit): 100.0% (41/41), 95% CI 91.4%–100.0%</title></path>
-<line x1="332.0" x2="332.0" y1="77.8" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
-<line x1="328.0" x2="336.0" y1="77.8" y2="77.8" stroke="#0b0b0b" stroke-width="1.5"/>
-<line x1="328.0" x2="336.0" y1="56.0" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
-<text x="332.0" y="51.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">100</text>
-<text x="315.0" y="328.0" font-size="12" fill="#0b0b0b" text-anchor="middle" font-weight="normal">claude-opus-5-5</text>
-<path d="M451.7,310.0 V60.0 Q451.7,56.0 455.7,56.0 H481.7 Q485.7,56.0 485.7,60.0 V310.0 Z" fill="#eb6834"><title>claude-sonnet-5-5 · No harness: 100.0% (41/41), 95% CI 91.4%–100.0%</title></path>
-<line x1="468.7" x2="468.7" y1="77.8" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
-<line x1="464.7" x2="472.7" y1="77.8" y2="77.8" stroke="#0b0b0b" stroke-width="1.5"/>
-<line x1="464.7" x2="472.7" y1="56.0" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
-<text x="468.7" y="51.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">100</text>
-<path d="M487.7,310.0 V60.0 Q487.7,56.0 491.7,56.0 H517.7 Q521.7,56.0 521.7,60.0 V310.0 Z" fill="#2a78d6"><title>claude-sonnet-5-5 · Harness (code + submit): 100.0% (41/41), 95% CI 91.4%–100.0%</title></path>
-<line x1="504.7" x2="504.7" y1="77.8" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
-<line x1="500.7" x2="508.7" y1="77.8" y2="77.8" stroke="#0b0b0b" stroke-width="1.5"/>
-<line x1="500.7" x2="508.7" y1="56.0" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
-<text x="504.7" y="51.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">100</text>
-<text x="487.7" y="328.0" font-size="12" fill="#0b0b0b" text-anchor="middle" font-weight="normal">claude-sonnet-5-5</text>
-<line x1="56" x2="574" y1="310.0" y2="310.0" stroke="#52514e" stroke-width="1"/>
+<path d="M101.8,310.0 V60.0 Q101.8,56.0 105.8,56.0 H131.8 Q135.8,56.0 135.8,60.0 V310.0 Z" fill="#eb6834"><title>claude-haiku-5-5 · No harness: 100.0% (41/41), 95% CI 91.4%–100.0%</title></path>
+<line x1="118.8" x2="118.8" y1="77.8" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
+<line x1="114.8" x2="122.8" y1="77.8" y2="77.8" stroke="#0b0b0b" stroke-width="1.5"/>
+<line x1="114.8" x2="122.8" y1="56.0" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
+<text x="118.8" y="51.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">100</text>
+<path d="M137.8,310.0 V66.2 Q137.8,62.2 141.8,62.2 H167.8 Q171.8,62.2 171.8,66.2 V310.0 Z" fill="#2a78d6"><title>claude-haiku-5-5 · Harness (code + submit): 97.6% (40/41), 95% CI 87.4%–99.6%</title></path>
+<line x1="154.8" x2="154.8" y1="88.0" y2="57.1" stroke="#0b0b0b" stroke-width="1.5"/>
+<line x1="150.8" x2="158.8" y1="88.0" y2="88.0" stroke="#0b0b0b" stroke-width="1.5"/>
+<line x1="150.8" x2="158.8" y1="57.1" y2="57.1" stroke="#0b0b0b" stroke-width="1.5"/>
+<text x="154.8" y="52.1" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">98</text>
+<text x="137.8" y="328.0" font-size="12" fill="#0b0b0b" text-anchor="middle" font-weight="normal">claude-haiku-5-5</text>
+<path d="M265.4,310.0 V60.0 Q265.4,56.0 269.4,56.0 H295.4 Q299.4,56.0 299.4,60.0 V310.0 Z" fill="#eb6834"><title>claude-opus-5-5 · No harness: 100.0% (41/41), 95% CI 91.4%–100.0%</title></path>
+<line x1="282.4" x2="282.4" y1="77.8" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
+<line x1="278.4" x2="286.4" y1="77.8" y2="77.8" stroke="#0b0b0b" stroke-width="1.5"/>
+<line x1="278.4" x2="286.4" y1="56.0" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
+<text x="282.4" y="51.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">100</text>
+<path d="M301.4,310.0 V60.0 Q301.4,56.0 305.4,56.0 H331.4 Q335.4,56.0 335.4,60.0 V310.0 Z" fill="#2a78d6"><title>claude-opus-5-5 · Harness (code + submit): 100.0% (41/41), 95% CI 91.4%–100.0%</title></path>
+<line x1="318.4" x2="318.4" y1="77.8" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
+<line x1="314.4" x2="322.4" y1="77.8" y2="77.8" stroke="#0b0b0b" stroke-width="1.5"/>
+<line x1="314.4" x2="322.4" y1="56.0" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
+<text x="318.4" y="51.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">100</text>
+<text x="301.4" y="328.0" font-size="12" fill="#0b0b0b" text-anchor="middle" font-weight="normal">claude-opus-5-5</text>
+<path d="M429.0,310.0 V60.0 Q429.0,56.0 433.0,56.0 H459.0 Q463.0,56.0 463.0,60.0 V310.0 Z" fill="#eb6834"><title>claude-sonnet-5-5 · No harness: 100.0% (41/41), 95% CI 91.4%–100.0%</title></path>
+<line x1="446.0" x2="446.0" y1="77.8" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
+<line x1="442.0" x2="450.0" y1="77.8" y2="77.8" stroke="#0b0b0b" stroke-width="1.5"/>
+<line x1="442.0" x2="450.0" y1="56.0" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
+<text x="446.0" y="51.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">100</text>
+<path d="M465.0,310.0 V60.0 Q465.0,56.0 469.0,56.0 H495.0 Q499.0,56.0 499.0,60.0 V310.0 Z" fill="#2a78d6"><title>claude-sonnet-5-5 · Harness (code + submit): 100.0% (41/41), 95% CI 91.4%–100.0%</title></path>
+<line x1="482.0" x2="482.0" y1="77.8" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
+<line x1="478.0" x2="486.0" y1="77.8" y2="77.8" stroke="#0b0b0b" stroke-width="1.5"/>
+<line x1="478.0" x2="486.0" y1="56.0" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
+<text x="482.0" y="51.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">100</text>
+<text x="465.0" y="328.0" font-size="12" fill="#0b0b0b" text-anchor="middle" font-weight="normal">claude-sonnet-5-5</text>
+<path d="M592.6,310.0 V60.0 Q592.6,56.0 596.6,56.0 H622.6 Q626.6,56.0 626.6,60.0 V310.0 Z" fill="#eb6834"><title>deepseek-flash · No harness: 100.0% (1/1), 95% CI 20.7%–100.0%</title></path>
+<line x1="609.6" x2="609.6" y1="257.5" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
+<line x1="605.6" x2="613.6" y1="257.5" y2="257.5" stroke="#0b0b0b" stroke-width="1.5"/>
+<line x1="605.6" x2="613.6" y1="56.0" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
+<text x="609.6" y="51.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">100</text>
+<path d="M628.6,310.0 V60.0 Q628.6,56.0 632.6,56.0 H658.6 Q662.6,56.0 662.6,60.0 V310.0 Z" fill="#2a78d6"><title>deepseek-flash · Harness (code + submit): 100.0% (1/1), 95% CI 20.7%–100.0%</title></path>
+<line x1="645.6" x2="645.6" y1="257.5" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
+<line x1="641.6" x2="649.6" y1="257.5" y2="257.5" stroke="#0b0b0b" stroke-width="1.5"/>
+<line x1="641.6" x2="649.6" y1="56.0" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
+<text x="645.6" y="51.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">100</text>
+<text x="628.6" y="328.0" font-size="12" fill="#0b0b0b" text-anchor="middle" font-weight="normal">deepseek-flash</text>
+<path d="M756.2,310.0 V60.0 Q756.2,56.0 760.2,56.0 H786.2 Q790.2,56.0 790.2,60.0 V310.0 Z" fill="#eb6834"><title>deepseek-v4-pro · No harness: 100.0% (1/1), 95% CI 20.7%–100.0%</title></path>
+<line x1="773.2" x2="773.2" y1="257.5" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
+<line x1="769.2" x2="777.2" y1="257.5" y2="257.5" stroke="#0b0b0b" stroke-width="1.5"/>
+<line x1="769.2" x2="777.2" y1="56.0" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
+<text x="773.2" y="51.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">100</text>
+<path d="M792.2,310.0 V60.0 Q792.2,56.0 796.2,56.0 H822.2 Q826.2,56.0 826.2,60.0 V310.0 Z" fill="#2a78d6"><title>deepseek-v4-pro · Harness (code + submit): 100.0% (1/1), 95% CI 20.7%–100.0%</title></path>
+<line x1="809.2" x2="809.2" y1="257.5" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
+<line x1="805.2" x2="813.2" y1="257.5" y2="257.5" stroke="#0b0b0b" stroke-width="1.5"/>
+<line x1="805.2" x2="813.2" y1="56.0" y2="56.0" stroke="#0b0b0b" stroke-width="1.5"/>
+<text x="809.2" y="51.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">100</text>
+<text x="792.2" y="328.0" font-size="12" fill="#0b0b0b" text-anchor="middle" font-weight="normal">deepseek-v4-pro</text>
+<line x1="56" x2="874" y1="310.0" y2="310.0" stroke="#52514e" stroke-width="1"/>
 <rect x="56" y="353" width="10" height="10" rx="2" fill="#eb6834"/>
 <text x="70.0" y="362.0" font-size="12" fill="#52514e" text-anchor="start" font-weight="normal">No harness</text>
 <rect x="146.0" y="353" width="10" height="10" rx="2" fill="#2a78d6"/>

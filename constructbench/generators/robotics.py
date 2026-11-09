@@ -9,8 +9,9 @@ from __future__ import annotations
 import math
 import random
 from collections import deque
+from itertools import permutations
 
-from ..task import Task, number, INTEGER, TEXT, answer_keys_line
+from ..task import Task, number, INTEGER, TEXT, SET, answer_keys_line
 from ..render import Canvas
 from .common import pick
 
@@ -198,3 +199,147 @@ def bricklaying(rng: random.Random, i: int) -> Task:
     return Task(f"rob-brick-{i:04d}", "robotics", "bricklaying", "Bricklaying robot throughput", "easy", prompt,
                 {"net_wall_area_sf": area, "bricks": bricks, "robot_days": round(robot_days, 4), "crew_days": round(crew_days, 4),
                  "faster": "robot" if robot_days < crew_days else "crew"}, fields)
+
+
+# ---------------------------------------------------------------- autonomous operation
+
+class _Redraw(Exception):
+    """A draw that would make the answer ambiguous; the family draws again from the same rng."""
+
+
+def _redrawing(fn):
+    def wrapper(rng: random.Random, i: int) -> Task:
+        for _ in range(200):
+            try:
+                return fn(rng, i)
+            except _Redraw:
+                continue
+        raise RuntimeError(f"{fn.__name__}: no unambiguous draw in 200 tries")
+    wrapper.__name__ = fn.__name__
+    wrapper.__doc__ = fn.__doc__
+    return wrapper
+
+
+@_redrawing
+def fleet_allocation(rng: random.Random, i: int) -> Task:
+    """Task allocation across a small autonomous fleet with a per-robot remaining range. The cheapest plan is neither
+    what a nearest-robot-first (greedy) dispatcher produces nor the cheapest plan when the range limit is ignored —
+    both mistakes are present in every item, so a model that skips either rule reports a different fleet plan.
+    A robot may take at most one task, which makes the answer an assignment rather than a routing problem."""
+    robots = [f"R{k}" for k in range(1, 6)]
+    tasks = [f"T{k}" for k in range(1, 5)]
+    dist = {(r, t): rng.randint(12, 95) for r in robots for t in tasks}
+    rng_ = {r: rng.randint(55, 160) for r in robots}
+
+    def plans(use_range: bool):
+        out = []
+        for combo in permutations(robots, len(tasks)):
+            if use_range and any(dist[(r, t)] > rng_[r] for r, t in zip(combo, tasks)):
+                continue
+            out.append((sum(dist[(r, t)] for r, t in zip(combo, tasks)), dict(zip(combo, tasks))))
+        return out
+
+    def greedy(use_range: bool):
+        left_r, left_t, total = list(robots), list(tasks), 0
+        while left_t:
+            pairs = [(dist[(r, t)], r, t) for r in left_r for t in left_t
+                     if not use_range or dist[(r, t)] <= rng_[r]]
+            if not pairs:
+                return None
+            d, r, t = min(pairs)                       # nearest feasible robot takes the nearest task, and so on
+            total += d
+            left_r.remove(r)
+            left_t.remove(t)
+        return total
+
+    def rank(ps):
+        return sorted(ps, key=lambda p: (p[0], sorted(f"{r}-{t}" for r, t in p[1].items())))
+
+    # Construct the range trap instead of hunting for it: take the plan that ignores the range limit and cap the range
+    # of the robot it leans on furthest, so that plan is infeasible and rule 2 provably changes the answer.
+    uncon = rank(plans(False))
+    if len(uncon) < 2 or uncon[1][0] == uncon[0][0]:
+        raise _Redraw                               # need a unique unconstrained optimum to cap away
+    unb_total, unb_map = uncon[0]
+    if not any(dist[(r, t)] > rng_[r] for r, t in unb_map.items()):
+        r_, t_ = max(unb_map.items(), key=lambda kv: dist[kv])
+        rng_[r_] = max(11, dist[(r_, t_)] - 1)
+
+    feasible = rank(plans(True))
+    if len(feasible) < 2:
+        raise _Redraw                               # capping the range left no workable plan
+    best_total, best_map = feasible[0]
+    if feasible[1][0] == best_total:
+        raise _Redraw                               # the optimum must be unique, or the answer is ambiguous
+    if best_total <= unb_total:
+        raise _Redraw                               # rule 2 must bind (it cannot if the cap did nothing)
+    greedy_total = greedy(True)                     # nearest-robot-first dispatch, recorded but not required: the
+    greedy_trap = greedy_total is None or greedy_total != best_total   # prompt asks for the optimum, not a dispatch
+
+    used = sorted(best_map.items())
+    idle = sorted(r for r in robots if r not in best_map)
+    fields = {"assignment": SET, "total_distance_m": INTEGER, "makespan_m": INTEGER, "idle_robots": SET}
+    head = "| Robot | Remaining range (m) | " + " | ".join(tasks) + " |\n|---|---|" + "---|" * len(tasks)
+    body = "\n".join(f"| {r} | {rng_[r]} | " + " | ".join(str(dist[(r, t)]) for t in tasks) + " |" for r in robots)
+    prompt = (
+        "Dispatch the work for this autonomous site fleet. Distances to each task and each robot's remaining range "
+        "are below (metres).\n\n" + head + "\n" + body + "\n\nDispatch rules:\n"
+        "1. Every task is performed by exactly one robot, and a robot performs at most one task.\n"
+        "2. A robot may only be given a task it can reach and return from: the distance must not exceed its "
+        "remaining range.\n"
+        "3. Choose the plan that minimises the total distance travelled by the assigned robots. If two plans tie on "
+        "the total, choose the one that comes first when each assignment is written \"R#-T#\" and the list is sorted "
+        "alphabetically.\n"
+        "4. The makespan is the longest single distance in the plan, because the robots work in parallel.\n\n"
+        "Give the assignment (one \"R#-T#\" string per assigned task), the total distance, the makespan, and the idle "
+        "robots.\n" + answer_keys_line(fields))
+    return Task(f"rob-fleet-{i:04d}", "robotics", "fleet_allocation",
+                "Autonomous fleet task allocation", "expert", prompt,
+                {"assignment": [f"{r}-{t}" for r, t in used], "total_distance_m": best_total,
+                 "makespan_m": max(dist[(r, t)] for r, t in used), "idle_robots": idle},
+                fields, {"robots": len(robots), "tasks": len(tasks), "greedy_trap": greedy_trap})
+
+
+@_redrawing
+def agv_safety_envelope(rng: random.Random, i: int) -> Task:
+    """Protective stop distance for an autonomous site vehicle (ISO 13855-style), then the fastest approach speed that
+    still fits inside the scanner's zone. Three things models get wrong here: the deceleration actually available at
+    the stated payload rather than the rated one, the millimetre tolerance, and solving for the speed instead of
+    scaling it. The answer to rule 4 depends on the answer to rule 2, so the two cannot be done independently."""
+    speed = round(rng.uniform(0.6, 2.4), 2)                  # m/s approach speed under consideration
+    K = rng.choice([1.6, 2.0])                               # approach-speed constant, m/s
+    T = round(rng.uniform(0.15, 0.55), 2)                    # total response time, s
+    a_rated = round(rng.uniform(2.0, 5.0), 1)                # rated deceleration, m/s²
+    payload = rng.choice([0, 150, 300, 450])                 # kg
+    loss = round(rng.uniform(0.0004, 0.0009), 5)             # fraction of deceleration lost per kg of payload
+    C = rng.choice([100, 150, 200])                          # tolerance, mm
+    zone = rng.randint(900, 2600)                            # detection zone distance, mm
+    a_load = a_rated * (1 - loss * payload)
+    S_mm = round((K * T + speed ** 2 / (2 * a_load) + C / 1000.0) * 1000, 1)
+    permitted = "yes" if zone >= S_mm else "no"
+    head = zone / 1000.0 - K * T - C / 1000.0                # metres left for braking inside the zone
+    if head <= 0:
+        raise _Redraw                                        # no positive permitted speed: uninteresting item
+    v_max = math.sqrt(2 * a_load * head)
+    fields = {"stopping_distance_mm": number(0.002), "deceleration_loaded_mps2": number(0.002),
+              "permitted": TEXT, "max_permitted_speed_mps": number(0.005)}
+    prompt = (
+        f"An autonomous site vehicle is being risk-assessed. Rated deceleration {a_rated} m/s². Each kilogram of "
+        f"payload costs {loss:.3%} of that deceleration, and the vehicle runs at a payload of {payload} kg. Total "
+        f"response time (scanner latency plus brake actuation) is {T} s; the approach-speed constant is K = {K} m/s; "
+        f"the tolerance is C = {C} mm. The safety scanner's detection zone reaches {zone} mm from the vehicle.\n\n"
+        "Rules:\n1. Protective stopping distance S = K × T + v² ÷ (2 × a) + C, where v is the approach speed in m/s, "
+        "a is the deceleration available at the stated payload, and C is the tolerance in metres. Report S in "
+        "millimetres.\n"
+        "2. The deceleration available is the rated deceleration reduced by the payload: "
+        "a = rated × (1 − loss per kg × payload).\n"
+        f"3. The approach speed under consideration is {speed} m/s. The installation is permitted only if the "
+        "detection zone is at least as large as S.\n"
+        "4. The maximum permitted approach speed is the highest v at which S still fits inside the detection zone, "
+        "using the same formula.\n\n"
+        "Give the stopping distance in millimetres, the payload-reduced deceleration, whether the installation is "
+        "permitted (\"yes\"/\"no\"), and the maximum permitted approach speed.\n" + answer_keys_line(fields))
+    return Task(f"rob-agv-{i:04d}", "robotics", "agv_safety_envelope",
+                "Autonomous vehicle safety envelope", "expert", prompt,
+                {"stopping_distance_mm": S_mm, "deceleration_loaded_mps2": round(a_load, 4),
+                 "permitted": permitted, "max_permitted_speed_mps": round(v_max, 4)}, fields, {"zone_mm": zone})

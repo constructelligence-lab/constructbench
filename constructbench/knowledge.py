@@ -36,6 +36,15 @@ CARDS: tuple[Card, ...] = (
          "Cost-to-cost: % complete = cost to date ÷ estimated total cost; earned revenue = % × contract value; "
          "over(under) billing = billed to date − earned revenue (positive = overbilled, negative = underbilled). "
          "The most underbilled job has the most negative value; report the amount as the task asks (sign or size)."),
+    Card("job cost ledger", (r"job cost", r"cost to date", r"accounts[- ]payable", r"cost code", r"duplicate",
+                             r"\bvoid\b", r"credit memo", r"roll[- ]?up"),
+         "Filter first, then reconcile, then sum. Keep only rows for the named job and dated on or before the cut-off "
+         "(\"as of DATE (inclusive)\" includes that date). Of what remains: a repeated INV with the same vendor + "
+         "document number + amount was entered twice, so count it once per extra copy (two identical rows = one "
+         "row's amount, three = one row's amount); a VOID cancels the INV sharing its vendor and document number, so "
+         "BOTH rows drop out — the voided invoice is not cost, it is a reversal; a CR (credit memo) counts with its "
+         "own negative amount. Sum the surviving amounts, and group by cost code when the task asks per code. A row "
+         "for another job, or dated after the cut-off, never counts even if it matches a document number."),
     Card("markups in sequence", (r"markup", r"\bfee\b", r"overhead (of|at|on|and|rate)", r"OH&P", r"\bbond\b", r"contingency", r"bid[- ]day"),
          "Apply markups in the stated order, each on the running total the task names: total = base × (1+a) × (1+b)"
          "… only when each applies to the running total; a markup on one part (e.g. self-performed only) applies to "
@@ -73,7 +82,18 @@ CARDS: tuple[Card, ...] = (
     Card("critical path", (r"critical path", r"critical activit", r"zero total float", r"total float", r"free float", r"predecessor", r"early start", r"late finish"),
          "Use cpm(activities): forward pass ES = max EF of predecessors (0 if none), EF = ES + duration; backward pass "
          "LF = min LS of successors (project finish if none), LS = LF − duration; TF = LS − ES; FF = min ES of "
-         "successors − EF. Critical = TF 0. For a delay, rerun cpm with the new duration and compare durations."),
+         "successors − EF. Critical = TF 0. For a delay, rerun cpm with the new duration and compare durations. "
+         "cpm() is finish-to-start with no lags — if any relationship carries SS, FF or a lag (+n), cpm() silently "
+         "ignores them: use pdm() instead."),
+    Card("PDM schedules on a calendar", (r"precedence", r"\bSS\+\d", r"\bFF\+\d", r"\bFS\+\d"),
+         "Day numbers, not dates: EF = ES + duration, the activity works days ES … EF−1 (duration 1 is one day), "
+         "nothing starts before day 0, and duration = the largest EF. Each relationship floors the successor — "
+         "FS+n → ES ≥ EF(P)+n, SS+n → ES ≥ ES(P)+n, FF+n → EF ≥ EF(P)+n — and every predecessor applies, so take "
+         "the maximum. In the backward pass SS and FF do not mirror the forward pass unless the lag is applied to the "
+         "right end (SS bounds LF by LS(successor) − lag + duration; FF by LF(successor) − lag); total float = "
+         "LS − ES, critical = 0, and floats can tie. Then day k is the k-th working day counting day 0 first (Mon–Fri, "
+         "holidays skipped), a start date is day ES's date, and the finish is day (duration − 1)'s date — one day "
+         "earlier than day duration. pdm(activities) and working_day_date(day0, k, holidays) do both."),
     Card("schedule quality", (r"missing (predecessor|successor)", r"negative lag", r"hard constraint",
                               r"schedule quality"),
          "Check each activity: no predecessors (except the start milestone), never named as a predecessor (except the "
@@ -85,7 +105,10 @@ CARDS: tuple[Card, ...] = (
          "1 CY = 27 cu ft; 1 SY = 9 sq ft; 1 square (roofing) = 100 sq ft; 1 ton = 2,000 lb. Inches to feet ÷ 12 "
          "before multiplying areas or volumes. Sheet goods (drywall, plywood): sheets = net area × (1 + waste) ÷ sheet "
          "area, rounded up. Waste: quantity × (1 + waste). Buy whole units with math.ceil only "
-         "where the task says to round up."),
+         "where the task says to round up. Metric jobs use the same methods with different units — convert() handles "
+         "it: 1 m³ = 1.30795 yd³, 1 m² = 10.7639 sq ft, 1 t = 1.10231 US tons, 1 kN = 0.22481 kip, 1 MPa = 145.038 psi, "
+         "1 kN/m³ ≈ 6.3659 pcf. Never mix systems inside one calculation: convert every input to the system the "
+         "answer must be in, then do the arithmetic."),
     Card("contract delays", (r"liquidated damages", r"excusable", r"compensable", r"concurrent", r"time extension",
                               r"extended general conditions"),
          "Excusable delay extends the completion date; compensable delay also pays (e.g. extended general conditions "
@@ -95,11 +118,20 @@ CARDS: tuple[Card, ...] = (
     Card("roofing", (r"roof", r"pitch", r"slope factor", r"shingle", r"bundle"),
          "Roof surface = plan area × slope factor (pitch factor = √(rise² + 12²) ÷ 12). Squares = surface ÷ 100, then "
          "× (1 + waste). Bundles = squares × bundles per square, rounded up."),
-    Card("earthwork", (r"\bcut\b", r"\bfill\b", r"earthwork", r"grid method", r"end area", r"swell", r"shrink"),
+    Card("earthwork", (r"cut[/ ]?(?:and )?fill", r"earthwork", r"grid method", r"end area", r"swell", r"shrink\b"),
          "Grid method: each cell's depth = average of its 4 corner (design − existing) values; volume = cell area × "
          "|depth| ÷ 27 CY; cut where the depth is negative, fill where positive (sum separately). A grid of R rows × C "
          "columns of points has (R−1) × (C−1) cells. Average end area: V = L × (A1 + A2) ÷ 2 ÷ 27. Loose = bank × "
          "(1 + swell); compacted = bank × (1 − shrink). Net > 0 fill means import."),
+    Card("mass haul", (r"mass[- ]haul", r"ordinate", r"bank cubic", r"compacted cubic", r"\bbcy\b", r"\bccy\b"),
+         "Mass diagram, cumulated in station order. Interval volume = (A1 + A2) ÷ 2 × length ÷ 27 (average end area); "
+         "cut is bank (bcy), fill is compacted (ccy), and 1 bcy of cut makes (1 − shrink) ccy of fill. The ordinate "
+         "starts at 0 and each next station adds that interval's cut × (1 − shrink) minus its fill. Two answers are "
+         "easy to swap: the values asked for are the PEAK of the cumulated ordinates (the largest value reached, at an "
+         "interior station — not the first, not the last) with the station it occurs at, while the net balance is the "
+         "FINAL ordinate ÷ (1 − shrink) (positive = surplus to export, negative = borrow). A peak landing on the first "
+         "or last station usually means the wrong column or a table read bottom-to-top. Echo stations as printed "
+         "(\"12+50\"). mass_haul(cut_areas, fill_areas, length, shrink, stations) returns all of it."),
     Card("paving", (r"asphalt", r"paving", r"\bpave\b", r"base course", r"surface course", r"HMA"),
          "HMA tons = area (SY) × thickness (in) × lb per SY-inch ÷ 2,000, per course; waste on the total only if the "
          "task says so. By volume: tons = area (sf) × thickness (ft) × density (lb/cf) ÷ 2,000."),
@@ -169,8 +201,8 @@ CARDS: tuple[Card, ...] = (
          "kgCO₂e = quantity × factor (matching units); tonnes = kg ÷ 1,000. Intensity = total kg ÷ floor area. A "
          "factor reduced by p% saves quantity × factor × p in that material only."),
     # ── robotics and survey ──
-    Card("differential leveling", (r"backsight", r"foresight", r"\bBS\b", r"\bFS\b", r"benchmark", r"\bBM-",
-                                   r"misclosure", r"level loop"),
+    Card("differential leveling", (r"backsight", r"foresight", r"benchmark", r"\bBM-", r"height of instrument",
+                                   r"\bHI\b", r"misclosure", r"level loop", r"rod reading"),
          "Height of instrument HI = known elevation + BS; next elevation = HI − FS; carry point to point in table "
          "order. Misclosure = computed closing elevation − known elevation (or Σ BS − Σ FS for a closed loop). "
          "Allowable misclosure is often k × √(distance) — use the task's constant and units. A negative FS (rod "

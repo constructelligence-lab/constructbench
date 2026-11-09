@@ -1,7 +1,45 @@
 # ConstructBench
 
-A benchmark of AI models on construction and the wider built world — the calculations, checks and readings people in the
-industry do every day — scored per domain so a result says *where* a model is strong or weak.
+**An open benchmark of AI models on construction and the built world.** The calculations, checks and readings people in
+the industry do every day: quantity takeoff, critical path, earned value, retainage, occupant load, IFC quantities,
+clash detection, delay claims and more. Every task is generated from a seed with its answer computed in code, so
+references are right by construction, a new seed gives a fresh unseen set, and scores are broken down by domain so a
+result says *where* a model is strong or weak.
+
+[![tests](https://github.com/constructelligence-lab/constructbench/actions/workflows/tests.yml/badge.svg)](https://github.com/constructelligence-lab/constructbench/actions/workflows/tests.yml)
+![domains](https://img.shields.io/badge/domains-17-1f6feb) ![task families](https://img.shields.io/badge/task%20families-77-1f6feb) ![dependencies](https://img.shields.io/badge/dependencies-none-2ea043) ![licence](https://img.shields.io/badge/licence-MIT-6e7781)
+
+> **Status: early, and growing fast.** Many more data sets, task families and tests are being added. Today: 77 task
+> families in 17 domains, 161 tests, and results for Claude, DeepSeek and open-weight models. Numbers in this README
+> are copied from [`docs/LEADERBOARD.md`](docs/LEADERBOARD.md), which is generated from the tracked result files.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/domains-dark.svg">
+    <img src="assets/domains-light.svg" alt="ConstructBench has 77 task families in 17 domains, with finance the largest at 9 families" width="100%">
+  </picture>
+</p>
+
+## What it found so far
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/tool-use-effect-dark.svg">
+    <img src="assets/tool-use-effect-light.svg" alt="On an 84-task expert set, giving a model a code tool and a strict answer schema lifted ling-3.0-flash from 40.5 to 96.4 percent, Claude Haiku 5.5 from 91.7 to 100 percent and DeepSeek Flash from 92.9 to 97.6 percent" width="100%">
+  </picture>
+</p>
+
+- **Tool use, not model size, explained most of the gap on small models.** On the 84-task expert set, a code tool plus a strict
+  answer schema lifted ling-3.0-flash from **40.5% to 96.4%**, Claude Haiku 5.5 from 91.7% to 100%, and DeepSeek Flash from
+  92.9% to 97.6%.
+- **Frontier Claude models are at the ceiling on the original sets** (Opus, Sonnet and Haiku at or near 100% on the
+  41- and 51-task sets), so those sets do not separate them. That is why the harder expert sets exist and why more
+  families are coming. We say so rather than quote a leaderboard that hides it.
+- **Caveats matter:** one seed per set, some runs stopped at a cost cap and are reported as not run, and `quick-families`
+  was a development set. All of it is spelled out in [`docs/LEADERBOARD.md`](docs/LEADERBOARD.md). The paper draft and
+  the lab notebook (every run, decision and anomaly, dated) are in [`paper/`](paper/).
+
+## Domains
 
 | Domain | What it tests |
 |---|---|
@@ -24,6 +62,13 @@ industry do every day — scored per domain so a result says *where* a model is 
 | BIM & digital construction | Clash detection on federated-model bounding boxes (hard and clearance clashes), quantities read out of an IFC4 STEP file through its containment and quantity relationships, COBie-style handover asset QA, ISO 19650 container naming against project code lists, 5D cost roll-up by Uniformat from a model schedule |
 
 ## How it works
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works-dark.svg">
+    <img src="assets/how-it-works-light.svg" alt="A seed feeds a generator that writes each task and computes its answer; a model answers with or without a code tool; each field is graded strictly; results are reported with 95 percent Wilson intervals" width="100%">
+  </picture>
+</p>
 
 - **Generated, not written.** Every task comes from a seeded generator; the answer is computed by the same
   code from the same numbers (and images are drawn from them), so references are right by construction and a
@@ -66,3 +111,17 @@ Generating a fresh seed is still the stronger guarantee; `decontam` is the check
 Write `fn(rng, i) -> Task` in `constructbench/generators/`, compute the answer in code, state every
 convention in the prompt (so there is exactly one right answer), and register it in `registry.FAMILIES`.
 The tests check the oracle scores 100% on it.
+
+## Roadmap
+
+More families and domains, more data sets, more tests, and harder tiers so that frontier models stop saturating. Held-out
+seeds stay private so that a score on them still means something. Ideas and task families are welcome: see
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Citing
+
+If you use ConstructBench, please cite it (see [`CITATION.cff`](CITATION.cff)) and say which seed and set you used.
+
+## Licence
+
+MIT: see [`LICENSE`](LICENSE). Built by [Constructelligence](https://constructelligence.co).

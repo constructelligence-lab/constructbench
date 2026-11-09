@@ -372,9 +372,12 @@ class Local(Provider):
             return Response(text="", ok=False, error=err, seconds=time.time() - t0)
         ch = out["choices"][0]
         usage = out.get("usage") or {}
+        raw = _usage_totals({}, usage)
+        cost = _usage_cost(raw)
         return Response(text=ch["message"].get("content") or "", stop_reason=ch.get("finish_reason"),
                         input_tokens=usage.get("prompt_tokens"), output_tokens=usage.get("completion_tokens"),
-                        seconds=time.time() - t0, extra={"usage": _usage_totals({}, usage)})
+                        seconds=time.time() - t0,
+                        extra={"usage": raw, **({} if cost is None else {"cost_usd": cost})})
 
     def _tool_loop(self, task: Task) -> Response:
         box = Toolbox(task, self.code, self.submit)
@@ -388,8 +391,10 @@ class Local(Provider):
             out, err = self._post({"model": self.model, "max_tokens": self.max_tokens, "temperature": 0,
                                    "messages": messages, "tools": tools, "tool_choice": "auto"})
             if err:
+                cost = _usage_cost(raw)
                 return Response(text=text, ok=False, error=err, seconds=time.time() - t0, input_tokens=tin,
-                                output_tokens=tout, extra={**box.extra(turns), "usage": raw})
+                                output_tokens=tout, extra={**box.extra(turns), "usage": raw,
+                                                           **({} if cost is None else {"cost_usd": cost})})
             usage = out.get("usage") or {}
             raw = _usage_totals(raw, usage)
             tin += usage.get("prompt_tokens") or 0
@@ -416,8 +421,10 @@ class Local(Provider):
                 break
             if turns == self.max_turns - 1:
                 messages.append({"role": "user", "content": LAST_TURN_NOTE})
+        cost = _usage_cost(raw)
         return Response(text=box.finish(text), stop_reason=stop, input_tokens=tin, output_tokens=tout,
-                        seconds=time.time() - t0, extra={**box.extra(turns), "usage": raw})
+                        seconds=time.time() - t0,
+                        extra={**box.extra(turns), "usage": raw, **({} if cost is None else {"cost_usd": cost})})
 
 
 def _usage_totals(acc: dict, usage: dict) -> dict:
@@ -433,6 +440,13 @@ def _usage_totals(acc: dict, usage: dict) -> dict:
                 if isinstance(v2, (int, float)) and not isinstance(v2, bool):
                     out[f"{k}.{k2}"] = out.get(f"{k}.{k2}", 0) + v2
     return out
+
+
+def _usage_cost(raw: dict) -> float | None:
+    """A server-reported cost for the task, when the API sends one — OpenRouter puts it in usage.cost, and
+    _usage_totals sums it over the tool turns. Returns None when the server reports no cost."""
+    c = raw.get("cost")
+    return c if isinstance(c, (int, float)) and not isinstance(c, bool) else None
 
 
 def _flags(rest: str, allowed: set[str]) -> tuple[str, set[str]]:

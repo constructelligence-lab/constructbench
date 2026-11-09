@@ -16,7 +16,7 @@ from pathlib import Path
 
 from . import registry
 from .providers import make
-from .runner import load_tasks, save_tasks, run, regrade, summarize
+from .runner import load_tasks, save_tasks, run, regrade, result_files, summarize
 from .task import DOMAINS
 
 
@@ -103,13 +103,20 @@ def cmd_run(a):
 
 
 def cmd_score(a):
-    rows = regrade(Path(a.results), load_tasks(Path(a.tasks)))
+    tasks = load_tasks(Path(a.tasks))
+    rows = regrade(Path(a.results), tasks)
     s = summarize(rows)
     if a.json:
         print(json.dumps(s, indent=1)); return
     o = s["overall"]
     print(f"{Path(a.results).name}: {o['correct']}/{o['n']} fully correct = {_pct(o['accuracy'])} "
-          f"(95% CI {_pct(o['ci95'][0])}–{_pct(o['ci95'][1])}), field score {_pct(o['field_score'])}")
+          f"(95% CI {_pct(o['ci95'][0])}–{_pct(o['ci95'][1])}) · partial credit {_pct(o['field_score'])}")
+    print(f"  completion {_pct(s['completion'])} ({o['n']}/{s['attempted']} answered, {s['not_run']} not run) · "
+          f"format compliance {_pct(o['format_ok'])} ({o['unparsed']} unparseable)")
+    if getattr(a, "lenient", False) and o["unparsed"]:
+        lo = summarize(regrade(Path(a.results), tasks, lenient=True))["overall"]
+        print(f"  if the ANSWER: line is not required: {lo['correct']}/{lo['n']} = {_pct(lo['accuracy'])} "
+              f"({lo['correct'] - o['correct']:+d} tasks recovered) — reported beside the strict score, never instead")
     for d, v in s["domains"].items():
         print(f"  {d:22s} {_pct(v['accuracy']):>7s}  ({v['correct']}/{v['n']}; fields {_pct(v['field_score'])}; "
               f"{v['mean_seconds']:.1f}s/task)")
@@ -125,12 +132,19 @@ def cmd_leaderboard(a):
             runs.append((rows[0]["provider"], summarize(rows)))
     runs.sort(key=lambda r: r[1]["overall"]["accuracy"], reverse=True)
     doms = [d for d in DOMAINS if any(d in s["domains"] for _, s in runs)]
-    lines = ["# ConstructBench leaderboard", "", f"Task set: `{Path(a.tasks).name}` · {len(tasks)} tasks · accuracy = every field right", "",
-             "| Model | Overall | " + " | ".join(short(d) for d in doms) + " |", "|---|---|" + "---|" * len(doms)]
+    head = ["| Model | Overall | Partial | Completion | Format | " + " | ".join(short(d) for d in doms) + " |",
+            "|---|---|---|---|---|" + "---|" * len(doms)]
+    lines = ["# ConstructBench leaderboard", "",
+             f"Task set: `{Path(a.tasks).name}` · {len(tasks)} tasks · accuracy = every field right", "",
+             "Partial = mean share of fields right. Completion = tasks the run managed to answer at all (API failures "
+             "and budget stops are *not run*, never wrong). Format = answers that wrote the answer contract. "
+             "The domain columns are strict accuracy.", ""] + head
     for name, s in runs:
         o = s["overall"]
         cells = [(_pct(s["domains"][d]["accuracy"]) if d in s["domains"] else "—") for d in doms]
-        lines.append(f"| {name} | **{_pct(o['accuracy'])}** ({o['n']}) | " + " | ".join(cells) + " |")
+        lines.append(f"| {name} | **{_pct(o['accuracy'])}** ({o['correct']}/{o['n']}) | {_pct(o['field_score'])} | "
+                     f"{_pct(s['completion'])} ({o['n']}/{s['attempted']}) | {_pct(o['format_ok'])} | "
+                     + " | ".join(cells) + " |")
     lines += ["", "Domains: " + "; ".join(f"**{short(d)}** — {DOMAINS[d]}" for d in doms)]
     text = "\n".join(lines) + "\n"
     if a.out:
@@ -152,7 +166,9 @@ def cmd_compare(a):
     sa, sb = summarize(ra), summarize(rb)
     st = paired(ra, rb)
     lines = [f"# {na} vs {nb}", "", f"{st['tasks']} tasks answered by both (of {len(tasks)} in `{Path(a.tasks).name}`); "
-             f"runs: {st['runs_a']} vs {st['runs_b']}.", "",
+             f"runs: {st['runs_a']} vs {st['runs_b']}."
+             + (f" Not run (API failure): {st['not_run_a']} vs {st['not_run_b']}."
+                if (st.get("not_run_a") or st.get("not_run_b")) else ""), "",
              f"| Domain | {na} | {nb} | Gap |", "|---|---|---|---|"]
     def row(label, x, y):
         gap = (x["accuracy"] - y["accuracy"]) * 100
@@ -191,6 +207,57 @@ def cmd_report(a):
     print(f"report: {build(dirs, Path(a.data), Path(a.out))}")
 
 
+def cmd_calibrate(a):
+    """Per-item difficulty across every run given: items every model passes carry no information for a frontier
+    comparison, and items every model fails are either broken or out of tier. Both are reported so a public set can
+    retire or re-seed them instead of publishing noise."""
+    tasks = load_tasks(Path(a.tasks))
+    files = [Path(p) for p in a.results] or result_files("results")
+    per_item: dict[str, list[bool]] = {}
+    for p in files:
+        for r in regrade(p, tasks):
+            if r["response"].get("ok", True):
+                per_item.setdefault(r["task_id"], []).append(bool(r["grade"]["correct"]))
+    rows = []
+    for t in tasks:
+        res = per_item.get(t.id)
+        if not res:
+            rows.append({"task_id": t.id, "category": t.category, "difficulty": t.difficulty, "runs": 0,
+                         "pass_rate": "", "verdict": "never run"})
+            continue
+        p = sum(res) / len(res)
+        verdict = ("retire: every run passed" if p == 1.0 else "retire: every run failed" if p == 0.0 else "ok")
+        rows.append({"task_id": t.id, "category": t.category, "difficulty": t.difficulty, "runs": len(res),
+                     "pass_rate": f"{p:.3f}", "verdict": verdict})
+    live = [r for r in rows if r["pass_rate"] != ""]
+    informative = sum(float(r["pass_rate"]) * (1 - float(r["pass_rate"])) for r in live) / len(live) if live else 0.0
+    counts = {v: sum(1 for r in rows if r["verdict"] == v)
+              for v in ("ok", "retire: every run passed", "retire: every run failed", "never run")}
+    lines = ["# ConstructBench item calibration", "",
+             f"{len(rows)} tasks scored from {len(a.results)} result file(s); {len(live)} answered at least once.", "",
+             f"**Informativeness (mean p(1−p)): {informative:.3f}** — 0.25 is ideal, 0 means every item is passed or "
+             "failed by everyone and the set cannot separate models.", ""]
+    lines += [f"- ok (0 < p < 1): {counts['ok']}",
+              f"- retire — every run passed: {counts['retire: every run passed']}",
+              f"- retire — every run failed: {counts['retire: every run failed']}",
+              f"- never run: {counts['never run']}", ""]
+    flagged = [r for r in rows if r["verdict"].startswith("retire")]
+    if flagged:
+        lines += [f"## Items to retire ({len(flagged)})", "",
+                  "| Task | Category | Difficulty | Runs | Pass | Verdict |", "|---|---|---|---|---|---|"]
+        lines += [f"| {r['task_id']} | {r['category']} | {r['difficulty']} | {r['runs']} | {r['pass_rate']} | "
+                  f"{r['verdict']} |" for r in flagged]
+    text = "\n".join(lines) + "\n"
+    if getattr(a, "out", None):
+        import csv
+        with open(a.out, "w", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=list(rows[0]))
+            w.writeheader()
+            w.writerows(rows)
+        print(f"csv: {a.out}")
+    print(text)
+
+
 def cmd_show(a):
     t = next((t for t in load_tasks(Path(a.tasks)) if t.id == a.id), None)
     if not t:
@@ -226,7 +293,11 @@ def main(argv=None):
     r.add_argument("--repeats", type=int, default=1, help="run every task this many times (run-to-run variance)")
     r.set_defaults(fn=cmd_run)
     s = sub.add_parser("score"); s.add_argument("results"); s.add_argument("--tasks", required=True); s.add_argument("--json", action="store_true")
+    s.add_argument("--lenient", action="store_true", help="also report what the score would be if the ANSWER line were not required")
     s.set_defaults(fn=cmd_score)
+    cal = sub.add_parser("calibrate", help="per-item difficulty: which items every run passes or fails (no information)")
+    cal.add_argument("results", nargs="+"); cal.add_argument("--tasks", required=True); cal.add_argument("--out")
+    cal.set_defaults(fn=cmd_calibrate)
     lb = sub.add_parser("leaderboard"); lb.add_argument("results", nargs="+"); lb.add_argument("--tasks", required=True); lb.add_argument("--out")
     lb.set_defaults(fn=cmd_leaderboard)
     cp = sub.add_parser("compare"); cp.add_argument("a"); cp.add_argument("b"); cp.add_argument("--tasks", required=True); cp.add_argument("--out")

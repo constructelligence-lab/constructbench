@@ -9,6 +9,7 @@
 #     CONDITIONS: base (no tools), code (+code), submit (+submit), harness (+code+submit); default "base harness"
 #     EFFORTS: Claude effort levels (file names get @<effort> unless it is high); REPEATS: runs per task
 #   BUDGET=4.50 TASK_BUDGET=0.30 LIMIT=2 scripts/bench.sh anthropic:claude-opus-5-5
+#   MAX_TOKENS=32000 scripts/bench.sh api:deepseek-flash@https://api.deepseek.com/v1   # per-reply output limit
 #     BUDGET: USD hard stop shared by every Claude result file in the output folder (stops starting tasks)
 #     TASK_BUDGET: USD cap per harness task;  LIMIT: only the first N tasks (a smoke test)
 #
@@ -30,6 +31,7 @@ CONDITIONS="${CONDITIONS:-base harness}"
 [ "$ONLY" = harness ] && CONDITIONS=harness
 EFFORTS="${EFFORTS:-$EFFORT}"
 REPEATS="${REPEATS:-1}"
+MAX_TOKENS="${MAX_TOKENS:-}"
 OUT="results/$(basename "$TASKS" .jsonl)"
 mkdir -p "$OUT"
 if [ -n "${LIMIT:-}" ]; then
@@ -60,7 +62,7 @@ for spec in "$@"; do
       echo "== $s effort=$eff repeats=$REPEATS -> $file"
       m=(); while IFS= read -r x; do m+=("$x"); done < <(money)
       "$PY" -m constructbench run --tasks "$TASKS" --provider "$s" --out "$file" --workers "$WORKERS" --effort "$eff" \
-        --repeats "$REPEATS" ${m[@]+"${m[@]}"}
+        --repeats "$REPEATS" ${MAX_TOKENS:+--max-tokens "$MAX_TOKENS"} ${m[@]+"${m[@]}"}
       "$PY" -m constructbench score "$file" --tasks "$TASKS" | head -1
     done
   done

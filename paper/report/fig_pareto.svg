@@ -4,39 +4,45 @@
 <rect width="640" height="420" fill="#fcfcfb"/>
 <text x="64.0" y="22.0" font-size="15" fill="#0b0b0b" text-anchor="start" font-weight="600">Cost per task vs accuracy</text>
 <text x="64.0" y="40.0" font-size="12" fill="#8a8984" text-anchor="start" font-weight="normal">Pooled over task sets · log cost axis · line joins runs no other run beats on both</text>
-<line x1="120.3" x2="120.3" y1="76" y2="360" stroke="#e6e5e0"/>
-<text x="120.3" y="376.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">$0.001</text>
-<line x1="222.1" x2="222.1" y1="76" y2="360" stroke="#e6e5e0"/>
-<text x="222.1" y="376.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">$0.002</text>
-<line x1="356.8" x2="356.8" y1="76" y2="360" stroke="#e6e5e0"/>
-<text x="356.8" y="376.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">$0.005</text>
-<line x1="458.6" x2="458.6" y1="76" y2="360" stroke="#e6e5e0"/>
-<text x="458.6" y="376.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">$0.01</text>
-<line x1="560.5" x2="560.5" y1="76" y2="360" stroke="#e6e5e0"/>
-<text x="560.5" y="376.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">$0.02</text>
+<line x1="116.3" x2="116.3" y1="76" y2="360" stroke="#e6e5e0"/>
+<text x="116.3" y="376.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">$0.001</text>
+<line x1="219.0" x2="219.0" y1="76" y2="360" stroke="#e6e5e0"/>
+<text x="219.0" y="376.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">$0.002</text>
+<line x1="354.8" x2="354.8" y1="76" y2="360" stroke="#e6e5e0"/>
+<text x="354.8" y="376.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">$0.005</text>
+<line x1="457.5" x2="457.5" y1="76" y2="360" stroke="#e6e5e0"/>
+<text x="457.5" y="376.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">$0.01</text>
+<line x1="560.2" x2="560.2" y1="76" y2="360" stroke="#e6e5e0"/>
+<text x="560.2" y="376.0" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="normal">$0.02</text>
 <line x1="64" x2="600" y1="360.0" y2="360.0" stroke="#e6e5e0"/>
-<text x="56.0" y="364.0" font-size="11" fill="#8a8984" text-anchor="end" font-weight="normal">90%</text>
+<text x="56.0" y="364.0" font-size="11" fill="#8a8984" text-anchor="end" font-weight="normal">0%</text>
 <line x1="64" x2="600" y1="289.0" y2="289.0" stroke="#e6e5e0"/>
-<text x="56.0" y="293.0" font-size="11" fill="#8a8984" text-anchor="end" font-weight="normal">92.5%</text>
+<text x="56.0" y="293.0" font-size="11" fill="#8a8984" text-anchor="end" font-weight="normal">25%</text>
 <line x1="64" x2="600" y1="218.0" y2="218.0" stroke="#e6e5e0"/>
-<text x="56.0" y="222.0" font-size="11" fill="#8a8984" text-anchor="end" font-weight="normal">95%</text>
+<text x="56.0" y="222.0" font-size="11" fill="#8a8984" text-anchor="end" font-weight="normal">50%</text>
 <line x1="64" x2="600" y1="147.0" y2="147.0" stroke="#e6e5e0"/>
-<text x="56.0" y="151.0" font-size="11" fill="#8a8984" text-anchor="end" font-weight="normal">97.5%</text>
+<text x="56.0" y="151.0" font-size="11" fill="#8a8984" text-anchor="end" font-weight="normal">75%</text>
 <line x1="64" x2="600" y1="76.0" y2="76.0" stroke="#e6e5e0"/>
 <text x="56.0" y="80.0" font-size="11" fill="#8a8984" text-anchor="end" font-weight="normal">100%</text>
-<path d="M123.6,121.8 L395.7,76.0" fill="none" stroke="#8a8984" stroke-width="1.5" stroke-dasharray="4 3"/>
-<circle cx="154.4" cy="121.8" r="5.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>claude-haiku-5-5 · No harness: $0.0013 per task, 98.4% correct (124 runs)</title></circle>
-<text x="154.4" y="111.8" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">haiku-5-5</text>
-<circle cx="123.6" cy="121.8" r="5.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>claude-haiku-5-5 · Harness (code + submit): $0.0010 per task, 98.4% correct (124 runs)</title></circle>
-<text x="123.6" y="138.8" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">haiku-5-5</text>
-<circle cx="530.6" cy="76.0" r="5.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>claude-opus-5-5 · No harness: $0.0163 per task, 100.0% correct (92 runs)</title></circle>
-<text x="530.6" y="66.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">opus-5-5</text>
-<circle cx="540.4" cy="76.0" r="5.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>claude-opus-5-5 · Harness (code + submit): $0.0174 per task, 100.0% correct (89 runs)</title></circle>
-<text x="540.4" y="93.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">opus-5-5</text>
-<circle cx="395.7" cy="76.0" r="5.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>claude-sonnet-5-5 · No harness: $0.0065 per task, 100.0% correct (92 runs)</title></circle>
-<text x="395.7" y="66.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">sonnet-5-5</text>
-<circle cx="433.1" cy="76.0" r="5.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>claude-sonnet-5-5 · Harness (code + submit): $0.0084 per task, 100.0% correct (92 runs)</title></circle>
-<text x="433.1" y="93.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">sonnet-5-5</text>
+<path d="M124.1,86.1 L162.6,78.8 L394.0,76.0" fill="none" stroke="#8a8984" stroke-width="1.5" stroke-dasharray="4 3"/>
+<circle cx="224.3" cy="88.3" r="5.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>claude-haiku-5-5 · No harness: $0.0021 per task, 95.7% correct (208 runs)</title></circle>
+<text x="224.3" y="78.3" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">haiku-5-5</text>
+<circle cx="162.6" cy="78.8" r="5.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>claude-haiku-5-5 · Harness (code + submit): $0.0014 per task, 99.0% correct (206 runs)</title></circle>
+<text x="162.6" y="95.8" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">haiku-5-5</text>
+<circle cx="530.1" cy="76.0" r="5.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>claude-opus-5-5 · No harness: $0.0163 per task, 100.0% correct (92 runs)</title></circle>
+<text x="530.1" y="66.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">opus-5-5</text>
+<circle cx="539.9" cy="76.0" r="5.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>claude-opus-5-5 · Harness (code + submit): $0.0174 per task, 100.0% correct (89 runs)</title></circle>
+<text x="539.9" y="93.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">opus-5-5</text>
+<circle cx="394.0" cy="76.0" r="5.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>claude-sonnet-5-5 · No harness: $0.0065 per task, 100.0% correct (92 runs)</title></circle>
+<text x="394.0" y="66.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">sonnet-5-5</text>
+<circle cx="431.7" cy="76.0" r="5.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>claude-sonnet-5-5 · Harness (code + submit): $0.0084 per task, 100.0% correct (92 runs)</title></circle>
+<text x="431.7" y="93.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">sonnet-5-5</text>
+<circle cx="162.3" cy="245.0" r="5.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>inclusionai/ling-3.0-flash · No harness: $0.0014 per task, 40.5% correct (84 runs)</title></circle>
+<text x="162.3" y="235.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">inclusionai/ling-3.0-flash</text>
+<circle cx="124.1" cy="86.1" r="5.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>inclusionai/ling-3.0-flash · Harness (code + submit): $0.0011 per task, 96.4% correct (84 runs)</title></circle>
+<text x="124.1" y="103.1" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">inclusionai/ling-3.0-flash</text>
+<circle cx="283.9" cy="360.0" r="5.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"><title>openai/gpt-oss-120b · No harness: $0.0031 per task, 0.0% correct (10 runs)</title></circle>
+<text x="283.9" y="350.0" font-size="10" fill="#52514e" text-anchor="middle" font-weight="normal">openai/gpt-oss-120b</text>
 <rect x="64" y="399" width="10" height="10" rx="2" fill="#eb6834"/>
 <text x="78.0" y="408.0" font-size="12" fill="#52514e" text-anchor="start" font-weight="normal">No harness</text>
 <rect x="154.0" y="399" width="10" height="10" rx="2" fill="#2a78d6"/>

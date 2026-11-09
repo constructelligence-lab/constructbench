@@ -57,7 +57,17 @@ def mean_sd(xs: list[float]) -> tuple[float, float]:
 
 
 def paired(rows_a: list[dict], rows_b: list[dict]) -> dict:
-    """Compare two result sets task by task. Rows carry task_id, optional rep, grade.correct, response.extra.cost_usd."""
+    """Compare two result sets task by task. Rows carry task_id, optional rep, grade.correct, response.extra.cost_usd.
+    A side's calls that failed at the API are dropped from that side: a task the model was never allowed to attempt
+    is not a wrong answer (the pre-registered rule), so it is reported as not run instead."""
+    def not_ok(r):
+        return not (r.get("response") or {}).get("ok", True)
+
+    not_run_a = len({r["task_id"] for r in rows_a if not_ok(r)})
+    not_run_b = len({r["task_id"] for r in rows_b if not_ok(r)})
+    rows_a = [r for r in rows_a if not not_ok(r)]
+    rows_b = [r for r in rows_b if not not_ok(r)]
+
     def by_task(rows):
         out: dict[str, list[dict]] = {}
         for r in rows:
@@ -90,6 +100,7 @@ def paired(rows_a: list[dict], rows_b: list[dict]) -> dict:
     ca, cb = cost(ta), cost(tb)
     return {
         "tasks": len(common), "runs_a": sum(len(ta[t]) for t in common), "runs_b": sum(len(tb[t]) for t in common),
+        "not_run_a": not_run_a, "not_run_b": not_run_b,
         "acc_a": sum(pa) / len(pa) if pa else 0.0, "acc_b": sum(pb) / len(pb) if pb else 0.0,
         "diff": sum(diffs) / len(diffs) if diffs else 0.0, "diff_ci95": bootstrap_ci(diffs),
         "a_better_tasks": b, "b_better_tasks": c,

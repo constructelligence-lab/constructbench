@@ -1,9 +1,17 @@
 [project]
 name = "constructbench"
 version = "0.1.0"
-description = "A benchmark of AI models on construction work"
+description = "An open benchmark of AI models on construction and the built world"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Constructelligence" }]
+keywords = ["benchmark", "construction", "aec", "bim", "llm", "evaluation", "estimating", "scheduling"]
 requires-python = ">=3.10"
 dependencies = []
 
 [project.optional-dependencies]
 anthropic = ["anthropic"]
+
+[project.urls]
+Homepage = "https://constructelligence.co"
+Repository = "https://github.com/constructelligence-lab/constructbench"
